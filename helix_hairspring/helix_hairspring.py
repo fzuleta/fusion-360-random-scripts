@@ -11,11 +11,11 @@ def run(context):
         rootComp = design.rootComponent
 
         # Parameters for the flat spiral (in millimeters)
-        R = mm(0.85)  # Inner start radius in mm
-        revolutions = 11  # Number of revolutions
-        P = mm(0.2)  # Pitch (P) per revolution in mm (radial growth)
+        R = mm(0.65)  # Inner start radius in mm
+        revolutions = 13  # Number of revolutions
+        P = mm(0.17)  # Pitch (P) per revolution in mm (radial growth)
         rectWidth = mm(0.05)  # Width of the rectangular profile (in mm)
-        rectHeight = mm(0.23)  # Height of the rectangular profile (in mm)
+        rectHeight = mm(0.18)  # Height of the rectangular profile (in mm)
 
         # 1. Create the flat spiral path on the XY plane
         points_per_revolution = 50
