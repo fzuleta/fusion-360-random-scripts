@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "tsx ./src/index.ts"
+    "mill:wheel": "tsx ./src/index.ts --",
+    "mill:pinion": "tsx ./src/index.ts isPinion=true --"
   },
   "keywords": [],
   "author": "",
