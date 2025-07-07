@@ -21,19 +21,13 @@ npm install
 #### ➤ Mill a Wheel
 
 ```bash
-npm run mill:wheel -- m=0.13 Z=112
+npm run start -- m=0.13 Z=112
 ```
 
 You can also optionally specify the pinion it mates with:
 
 ```bash
-npm run mill:wheel -- m=0.13 Z=112 z=14
-```
-
-#### ➤ Mill a Pinion
-
-```bash
-npm run mill:pinion -- m=0.13 z=10
+npm run start -- m=0.13 Z=112 z=14
 ```
 
 ⚠️ Note: When milling a pinion, **only `z=` should be passed**, not `Z=`.

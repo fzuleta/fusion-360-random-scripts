@@ -73,7 +73,9 @@ function generatePinionGcode({
   add(`G0 A0.                           ; Reset A-axis`);
   add(`G0 X${safeX} Y${safeY}           ; Move to safe lateral position`);
 
+  add(`;This sequence will repeat ${Z} times`);
   for (let i = 0; i < Z; i++) {
+    add(`; ${i}:`);
     const angle = i * anglePerTooth;
     add(`(Tooth ${i + 1})`);
     add(`G0 Y${safeY}                    ; Go to safe Y`); 
@@ -84,6 +86,9 @@ function generatePinionGcode({
     add(`G0 Y${safeY}                    ; Retract in Y`);
   }
   
+  add(``);
+  add(`;Finished, exit sequence:`);
+  add(`;====================`);
   add(`G0 Y${safeY}                    ; Retract in Y`);
   add(`G49              ; Cancel tool length offset`);
   add(`M9               ; Coolant OFF`);
@@ -101,7 +106,6 @@ function generatePinionGcode({
 const init = async () => {
   // Argument parsing
   const args = process.argv.slice(2);
-  const isPinion = args.includes("isPinion=true");
   const ZArg = args.find(arg => arg.startsWith("Z="));
   const zArg = args.find(arg => arg.startsWith("z="));
   const mArg = args.find(arg => arg.startsWith("m="));
@@ -114,10 +118,6 @@ const init = async () => {
 
   // Handler for pinion
   const handlePinion = () => {
-    if (!!ZArg) {
-      console.error("You're making a pinion, but pass Z, pinion requires z");
-      process.exit(1);
-    }
     if (!zArg) {
       console.error("Usage: npm run mill:pinion -- z=6 m=0.13");
       process.exit(1);
@@ -156,21 +156,23 @@ const init = async () => {
     return gcode;
   };
 
+  const Z = ZArg ? parseInt(ZArg.split("=")[1], 10) : undefined;
+  const z = zArg ? parseInt(zArg.split("=")[1], 10) : undefined;
+
   // Main logic: dispatch to handlers
-  const data = (isPinion) ? handlePinion() : handleWheel();
-  if (data.trim() === '') { console.error('Error?'); process.exit(1); }
+  const dataWheel = handleWheel();
+  const dataPinion = !!z && handlePinion()
 
   const outDir = path.resolve(__dirname, '..', 'dist');
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir);
   }
-
-  const Z = ZArg ? parseInt(ZArg.split("=")[1], 10) : undefined;
-  const z = zArg ? parseInt(zArg.split("=")[1], 10) : undefined;
-
-  const filename = `m${module}${Z && '-Z'+Z}${z && '-z'+z}.nc`;
-  const outPath = path.join(outDir, filename);
-  fs.writeFileSync(outPath, data);
-  console.log(`✅ G-code saved to ${outPath}`);
+  [dataWheel,dataPinion].forEach((it, i)=>{
+    if (!it){ return; }
+    const filename = `${i===0?'wheel-':'pinion-'}m${module}${Z && '-Z'+Z}${z && '-z'+z}.nc`;
+    const outPath = path.join(outDir, filename);
+    fs.writeFileSync(outPath, it);
+    console.log(`✅ G-code saved to ${outPath}`);
+  })
 };
 init()
