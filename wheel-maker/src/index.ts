@@ -56,7 +56,7 @@ function generatePinionGcode({
   const safeY = (0 - radiusDa - 5).toFixed(4);
   const safeZ = (0 - radiusDa - 5).toFixed(4); // 5mm above the end of the stock
   const spindleSpeed = 10_000
-  const feedRate = 30
+  const feedRate = 100
   const finalXCut = -10 // to cut 10mm of stock
   const tool = toolNumber < 10 ? `0${toolNumber}` : toolNumber;
 
