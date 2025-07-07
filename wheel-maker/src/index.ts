@@ -58,6 +58,8 @@ function generatePinionGcode({
   const spindleSpeed = 10_000
   const feedRate = 30
   const finalXCut = -10 // to cut 10mm of stock
+  const tool = toolNumber < 10 ? `0${toolNumber}` : toolNumber;
+
   const add = (s: string) => lines.push(s);
 
   add(`(Milling a ${type} with ${Z} teeth)`);
@@ -65,9 +67,9 @@ function generatePinionGcode({
   add(`G21                              ; Metric mode`);
   add(`G28 G91 Z0.                      ; Home Z axis`);
   add(`G90                              ; Return to absolute mode`);
-  add(`T${toolNumber} M6                ; Tool change`);
+  add(`T${tool} M6                ; Tool change`);
   add(`G54                              ; Use work coordinate system`);
-  add(`G0 G43 Z${safeZ} H${toolNumber}  ; Tool length offset and retract`);
+  add(`G0 G43 Z${safeZ} H${tool}  ; Tool length offset and retract`);
   add(`S${spindleSpeed} M3              ; Spindle on`);
   add(`M8                               ; Coolant on`);
   add(`G0 A0.                           ; Reset A-axis`);
@@ -109,11 +111,15 @@ const init = async () => {
   const ZArg = args.find(arg => arg.startsWith("Z="));
   const zArg = args.find(arg => arg.startsWith("z="));
   const mArg = args.find(arg => arg.startsWith("m="));
+  const tArg = args.find(arg => arg.startsWith("t="));
+  const toolNumber = tArg ? parseFloat(tArg.split("=")[1]) : undefined;
   const module = mArg ? parseFloat(mArg.split("=")[1]) : undefined;
 
+  if (!toolNumber) {
+    console.error("toolNumber required, Usage: npm run start -- m=0.13 t=1 Z=112 [z=14]"); process.exit(1);
+  }
   if (!module) {
-    console.error("Module required, Usage: npm run start -- m=0.13 Z=112 [z=14]");
-    process.exit(1);
+    console.error("Module required, Usage: npm run start -- m=0.13 t=1 Z=112 [z=14]"); process.exit(1);
   }
 
   // Handler for pinion
@@ -124,13 +130,7 @@ const init = async () => {
     }
     const z = parseInt(zArg.split("=")[1], 10);
     const factors = helpers.getPinionFactors(z);
-    const gcode = generatePinionGcode({
-      factors,
-      Z: z,
-      module,
-      toolNumber: 1,
-      type: 'pinion'
-    });
+    const gcode = generatePinionGcode({ factors, Z: z, module, toolNumber, type: 'pinion' });
     return gcode;
   };
 
@@ -146,13 +146,7 @@ const init = async () => {
       ? helpers.getWheelFactors(z)
       : helpers.getAloneWheelFactors(Z);
     const type = z !== undefined ? 'wheel' : 'wheel-to-mesh';
-    const gcode = generatePinionGcode({
-      factors,
-      Z,
-      module,
-      toolNumber: 1,
-      type
-    });
+    const gcode = generatePinionGcode({ factors, Z, module, toolNumber, type});
     return gcode;
   };
 

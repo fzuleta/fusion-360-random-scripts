@@ -1,5 +1,3 @@
-
-
 # 🛠️ Wheel & Pinion G-code Generator for Elara 2 (Mach4)
 
 This project generates precise G-code for cutting watch wheels and pinions using the NSCNC Elara 2 4-axis CNC mill. It supports both wheel and pinion profiles and outputs safe, Mach4-compatible G-code.
@@ -21,17 +19,14 @@ npm install
 #### ➤ Mill a Wheel
 
 ```bash
-npm run start -- m=0.13 Z=112
+npm run start -- m=0.13 t=1 Z=112
 ```
 
 You can also optionally specify the pinion it mates with:
 
 ```bash
-npm run start -- m=0.13 Z=112 z=14
+npm run start -- m=0.13 t=1 Z=112 z=14
 ```
-
-⚠️ Note: When milling a pinion, **only `z=` should be passed**, not `Z=`.
-
 ---
 
 ## 🧠 How It Works
@@ -102,5 +97,3 @@ G0 Y-61.78
 ...
 M30
 ```
-
-
