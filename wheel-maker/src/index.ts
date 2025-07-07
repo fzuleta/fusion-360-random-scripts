@@ -164,12 +164,11 @@ const init = async () => {
   const dataPinion = !!z && handlePinion()
 
   const outDir = path.resolve(__dirname, '..', 'dist');
-  if (!fs.existsSync(outDir)) {
-    fs.mkdirSync(outDir);
-  }
+  (fs.existsSync(outDir)) && fs.rmSync(outDir, { recursive: true, force: true }); 
+  fs.mkdirSync(outDir);
   [dataWheel,dataPinion].forEach((it, i)=>{
     if (!it){ return; }
-    const filename = `${i===0?'wheel-':'pinion-'}m${module}${Z && '-Z'+Z}${z && '-z'+z}.nc`;
+    const filename = `${i===0?'wh-':'pi-'}m${module}${Z ? '-Z'+Z:''}${z ? '-z'+z : ''}.nc`;
     const outPath = path.join(outDir, filename);
     fs.writeFileSync(outPath, it);
     console.log(`✅ G-code saved to ${outPath}`);
