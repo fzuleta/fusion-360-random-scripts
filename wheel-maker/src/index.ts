@@ -1,4 +1,6 @@
-import * as helpers from './helpers';
+import * as helpers from './helpers'; 
+import fs from 'fs';
+import path from 'path';
 
 /**
  Machine Kinematics
@@ -59,13 +61,17 @@ function generatePinionGcode({
   const add = (s: string) => lines.push(s);
 
   add(`(Milling a ${type} with ${Z} teeth)`);
-  add(`G90 G94 G17 G21               ; Absolute positioning, feed/min, XY plane, mm units`);
-  add(`G40 G49 G80                   ; Cancel cutter radius comp, tool length offset, and canned cycles`);
-  add(`G54                           ; Use work coordinate system G54`);
-  add(`T${toolNumber} M6             ; Tool change`);
-  add(`G43 H${toolNumber}           ; Apply tool length offset and move Z`); 
-  add(`G0 X${safeX} Y${safeY}        ; Retract XY to safe `);
-  add(`M3 S${spindleSpeed}           ; Start spindle clockwise at speed`);
+  add(`G90 G94 G91.1 G40 G49 G17        ; Modal safe state`);
+  add(`G21                              ; Metric mode`);
+  add(`G28 G91 Z0.                      ; Home Z axis`);
+  add(`G90                              ; Return to absolute mode`);
+  add(`T${toolNumber} M6                ; Tool change`);
+  add(`G54                              ; Use work coordinate system`);
+  add(`G0 G43 Z${safeZ} H${toolNumber}  ; Tool length offset and retract`);
+  add(`S${spindleSpeed} M3              ; Spindle on`);
+  add(`M8                               ; Coolant on`);
+  add(`G0 A0.                           ; Reset A-axis`);
+  add(`G0 X${safeX} Y${safeY}           ; Move to safe lateral position`);
 
   for (let i = 0; i < Z; i++) {
     const angle = i * anglePerTooth;
@@ -77,68 +83,94 @@ function generatePinionGcode({
     add(`G1 X${finalXCut} F${feedRate}   ; CUT!!!!`);
     add(`G0 Y${safeY}                    ; Retract in Y`);
   }
+  
   add(`G0 Y${safeY}                    ; Retract in Y`);
-  add(`G0 Z${safeZ}       ; Retract Z to safe height`);
-  add(`M5                ; Stop spindle`);
-  add(`G49`);
-  add(`M30               ; End program`);
+  add(`G49              ; Cancel tool length offset`);
+  add(`M9               ; Coolant OFF`);
+  add(`M5               ; Spindle STOP`);
+  add(`G28 G91 Z0.      ; Home Z axis`);
+  add(`G90              ; Return to absolute mode`);
+  add(`G0 A0.           ; Reset A-axis`);
+  add(`G28 G91 X0. Y0.  ; Home X and Y axes`);
+  add(`G90              ; Return to absolute mode`);
+  add(`M30              ; End program and rewind`);
 
   return lines.join('\n');
 }
 
 const init = async () => {
+  // Argument parsing
   const args = process.argv.slice(2);
   const isPinion = args.includes("isPinion=true");
   const ZArg = args.find(arg => arg.startsWith("Z="));
   const zArg = args.find(arg => arg.startsWith("z="));
   const mArg = args.find(arg => arg.startsWith("m="));
   const module = mArg ? parseFloat(mArg.split("=")[1]) : undefined;
-  let gcode = ""
+
   if (!module) {
-    console.error("Usage: npm run start -- m=0.13 Z=112 [z=14]");
+    console.error("Module required, Usage: npm run start -- m=0.13 Z=112 [z=14]");
     process.exit(1);
   }
-  if (isPinion) {
+
+  // Handler for pinion
+  const handlePinion = () => {
+    if (!!ZArg) {
+      console.error("You're making a pinion, but pass Z, pinion requires z");
+      process.exit(1);
+    }
     if (!zArg) {
-      console.error("Usage: npm run mill:pinion -- z=6");
+      console.error("Usage: npm run mill:pinion -- z=6 m=0.13");
       process.exit(1);
     }
     const z = parseInt(zArg.split("=")[1], 10);
     const factors = helpers.getPinionFactors(z);
-    gcode = generatePinionGcode({
+    const gcode = generatePinionGcode({
       factors,
       Z: z,
       module,
       toolNumber: 1,
       type: 'pinion'
     });
-    console.log(gcode);
-    return;
-  } else {
+    return gcode;
+  };
 
+  // Handler for wheel
+  const handleWheel = () => {
     if (!ZArg) {
-      console.error("Usage: npm run start -- m=0.13 Z=112 [z=14]"); 
+      console.error("Usage: npm run start -- m=0.13 Z=112 [z=14]");
       process.exit(1);
     }
-
-    const Z = parseInt(ZArg.split("=")[1], 10);
+    const Z = parseInt(ZArg.split("=")[1], 10); 
     const z = zArg ? parseInt(zArg.split("=")[1], 10) : undefined;
-
     const factors = z !== undefined
       ? helpers.getWheelFactors(z)
       : helpers.getAloneWheelFactors(Z);
-
     const type = z !== undefined ? 'wheel' : 'wheel-to-mesh';
-
-    gcode = generatePinionGcode({
+    const gcode = generatePinionGcode({
       factors,
       Z,
       module,
       toolNumber: 1,
       type
     });
+    return gcode;
+  };
+
+  // Main logic: dispatch to handlers
+  const data = (isPinion) ? handlePinion() : handleWheel();
+  if (data.trim() === '') { console.error('Error?'); process.exit(1); }
+
+  const outDir = path.resolve(__dirname, '..', 'dist');
+  if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir);
   }
 
-  console.log(gcode);
+  const Z = ZArg ? parseInt(ZArg.split("=")[1], 10) : undefined;
+  const z = zArg ? parseInt(zArg.split("=")[1], 10) : undefined;
+
+  const filename = `m${module}${Z && '-Z'+Z}${z && '-z'+z}.nc`;
+  const outPath = path.join(outDir, filename);
+  fs.writeFileSync(outPath, data);
+  console.log(`✅ G-code saved to ${outPath}`);
 };
 init()
