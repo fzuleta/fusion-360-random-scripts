@@ -56,41 +56,90 @@ def find_closest_number(nums, target):
 
 def calculate_nihs(I, D, d, f):
     """
-    Calculate elastic torque (M), hairspring stiffness (K) in dyne·cm²/rad,
-    and K in the units of the NIHS 35-10 table (10^-2 N·mm³/rad).
-    Additionally, match the closest K value from the provided CGS table.
+    Calculate the NIHS 35‑10 elastic torque constant **K**.
 
-    Parameters:
-    I (float): Moment of inertia (mg·cm²)
-    D (float): Outer diameter of the hairspring (cm)
-    d (float): Inner diameter of the hairspring (cm)
-    f (float): Frequency (Hz)
+    Parameters
+    ----------
+    I : float
+        Mass moment of inertia of the balance in **mg·cm²**.
+    D : float
+        Outer diameter of the hairspring in **mm**.
+    d : float
+        Inner diameter of the hairspring (collet diameter) in **mm**.
+    f : float
+        Frequency of oscillation in **Hz**.
 
-    Returns:
-    M (float): Elastic torque (mg·cm²·s²/rad)
-    K (float): Hairspring stiffness (dyne·cm²/rad)
-    K_closest_match (float): Closest CGS value from the table
-    """    
-    # Calculate elastic torque (M)
-    M = I * 4 * math.pi**2 * f**2
-    
-    # Calculate hairspring stiffness (K) in dyne·cm²/rad
-    K = M * (D**2 - d**2)
-    
-    # Convert K to the table unit (10^-2 N·mm³/rad)
-    K_table_units = K * 10**-3
-    
-    # Find the closest match in the CGS table
+    Returns
+    -------
+    tuple
+        M : float  – elastic torque in **N·mm / rad**
+        K : float  – hairspring stiffness in **N·mm³ / rad**
+        K_closest_match : float – closest standard value from the NIHS 35‑10 table,
+                               expressed in **10⁻² N·mm³ / rad**.
+    """
+    # 1 mg = 1 × 10⁻⁶ kg ; 1 cm = 1 × 10⁻² m
+    I_kg_m2 = I * 1e-6 * (1e-2) ** 2           # kg·m²
+
+    # Elastic torque  M  in N·m/rad, then convert to N·mm/rad
+    M_Nm  = I_kg_m2 * (2 * math.pi * f) ** 2
+    M     = M_Nm * 1_000                       # N·mm/rad  (1 m = 1000 mm)
+
+    # Hairspring stiffness  K  in N·mm³/rad
+    K = M * (D ** 2 - d ** 2)
+
+    # Convert to NIHS table units (10⁻² N·mm³ / rad)
+    K_table_units = K / 0.01
+
+    # Find the closest match in the standard table
     K_closest_match = find_closest_number(sort_numbers_ascending(numbers), K_table_units)
-    
+
     return M, K, K_closest_match
 
-I = 12.5 # mg·cm² 
-D = mm(6.0) # cm (This is the outer diameter of the hairspring)
-d = mm(1.3) # cm (This is the inner diameter of the hairspring, which corresponds to the attachment at the virole (the collet) that fits at the center of the balance wheel.)
+
+# -------------------------------------------------------------------------
+def torque_gcm_per_100deg(I, D, d, f):
+    """
+    Return the hairspring torque expressed in **gram‑centimetre per 100 °**.
+
+    Historical datasheets often quote the hairspring’s moment of force as “g · cm / 100°”.
+    This helper derives it from the elastic torque constant *M* produced by
+    ``calculate_nihs``.
+
+    Parameters
+    ----------
+    I, D, d, f
+        Same definitions as in :pyfunc:`calculate_nihs`.
+
+    Returns
+    -------
+    float
+        Torque in **g · cm per 100 °**.
+    """
+    # Elastic torque in N·mm per radian
+    M, _, _ = calculate_nihs(I, D, d, f)
+
+    # Convert 100° to radians
+    theta_rad = math.radians(100)
+
+    # Torque for 100° in N·mm
+    T_Nmm = M * theta_rad
+
+    # Convert from N·mm  →  g·cm
+    # 1 N = 101.97162129779 gf and 1 mm = 0.1 cm
+    T_gcm = T_Nmm * 0.1 * 101.97162129779
+
+    return T_gcm
+import math
+
+I = 12.5 # mg·cm² for copper beryllium
+D = 6 #mm (This is the outer diameter of the hairspring)
+d = 1.3 #mm (This is the inner diameter of the hairspring, which corresponds to the attachment at the virole (the collet) that fits at the center of the balance wheel.)
 f = 4 # Hz (4=28,800 vph 5=36000)
 
 M, K, K_closest_match = calculate_nihs(I, D, d, f)
-print(f"Elastic Torque (M): {M} mg·cm²·s²/rad")
-print(f"Hairspring Stiffness (K): {K} dyne·cm²/rad")
-print(f"Closest Match from Table: {K_closest_match} (10^-2 N·mm³/rad)")
+print(f"Elastic Torque (M): {M:.6g} N·mm/rad")
+print(f"Hairspring Stiffness (K): {K:.6g} N·mm³/rad")
+print(f"Closest Match from NIHS 35-10 Table: {K_closest_match} (10^-2 N·mm³/rad)")
+
+T100 = torque_gcm_per_100deg(I, D, d, f)
+print(f"Torque for 100°: {T100:.6g} g·cm/100°")
