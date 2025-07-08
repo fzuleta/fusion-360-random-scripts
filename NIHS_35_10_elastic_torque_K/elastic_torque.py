@@ -129,7 +129,6 @@ def torque_gcm_per_100deg(I, D, d, f):
     T_gcm = T_Nmm * 0.1 * 101.97162129779
 
     return T_gcm
-import math
 
 I = 12.5 # mg·cm² for copper beryllium
 D = 6 #mm (This is the outer diameter of the hairspring)
