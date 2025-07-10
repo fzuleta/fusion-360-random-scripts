@@ -5,7 +5,6 @@ import styles from './app.module.scss'
 import { getLines, type ILinesGotten } from './toolpath'
 import { STLLoader } from 'three-stdlib';
  
-const hexs = [0x5ba5dd, 0x5ba5dd, 0xe69d9d]
 function App() {
   const [bitRadius, setBitRadius] = React.useState(3.175 / 2);
   const [stepOver, setStepOver] = React.useState(0.04);
@@ -15,9 +14,9 @@ function App() {
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
   const toolpathGroupRef = React.useRef<THREE.Group | null>(null);
 
-  const createLine = (p: THREE.Vector3, radius: number, color=0xffffff) => {
+  const createLine = (p: THREE.Vector3, radius: number, color: THREE.Color) => {
     const ringGeom = new THREE.RingGeometry(radius - 0.01, radius, 512);
-    const ringMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.05 });
+    const ringMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.1 });
     const ring = new THREE.Line(ringGeom, ringMat);
     ring.position.set(p.x, p.y, 0.02); // offset slightly in Z to avoid z-fighting
     toolpathGroupRef.current!.add(ring);
@@ -35,10 +34,10 @@ function App() {
 
     // Render morphedLines with progressively lighter color
     morphedLines.forEach((points, index) => {
-      const t = index / morphedLines.length
+      const t = index / (morphedLines.length-1)
       const color = new THREE.Color().lerpColors(
-        new THREE.Color(0xd72c12),
         new THREE.Color(0xffff00),
+        new THREE.Color(0xff7200),
         t
       )
       const material = new THREE.LineBasicMaterial({ color }) 
@@ -48,9 +47,10 @@ function App() {
       // Draw a translucent circle at each point
 
       points.forEach((p) => {
-        createLine(p, 0.05)
-        if (index <= 1 || index === points.length - 2) { 
-          createLine(p, bitRadius, hexs[index] || hexs[hexs.length-1])
+        if (index <= 1 || index === morphedLines.length - 1) { 
+          createLine(p, 0.05, new THREE.Color(0xffffff));
+          console.log(index, morphedLines.length)
+          createLine(p, bitRadius, color)
         }
       }); 
     })

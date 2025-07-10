@@ -16,12 +16,12 @@ export function morphLines(props: {
 
   let A = lineA.length === targetCount ? lineA : resampleLine(lineA, lineB);
   let B = lineB.length === targetCount ? lineB : resampleLine(lineB, lineA);
-
+  const subdivide = 1;
   A = normalizeLineDirectionRightToLeft(
         offsetLineConsideringBitRadius(
           densifyLine(
             normalizeLineDirectionRightToLeft(A)
-            , 5)
+            , subdivide)
          , bitRadius
         )
       );
@@ -30,7 +30,7 @@ export function morphLines(props: {
         offsetLineConsideringBitRadius(
           densifyLine(
             normalizeLineDirectionRightToLeft(B)
-            , 5)
+            , subdivide)
           , bitRadius
         )
       );
