@@ -1,6 +1,6 @@
 interface IModel {
   filename: string;
-  getPasses: (stockRadius: number) => { lineStart: PointXY[], lineA: PointXY[], lineB: PointXY[], bitRadius: number }[]
+  getPasses: (stockRadius: number) => { lineStart: PointXY[], lineA: PointXY[], lineB: PointXY[], lineB_offset: PointXY[], bitRadius: number }[]
 }
 export const models: {[key: string]: IModel} = {
   "model_0_13_Z112": {
@@ -17,6 +17,8 @@ export const models: {[key: string]: IModel} = {
         { x: safeX, y: stockRadius }, 
         { x: 0, y: stockRadius }
       ];
+      lineStart.forEach(it => it.y += bitRadius);
+
       let lineA = [ // the border of the stock
         { x: 0, y: stockRadius }, 
         { x: -25.6, y: stockRadius }
@@ -29,10 +31,20 @@ export const models: {[key: string]: IModel} = {
           { x: -10, y: 0.7 },
           { x: -15.6, y: stockRadius }
         ];
-      passes.push({ lineStart, lineA, lineB, bitRadius });
 
+      lineA.forEach(it => it.y += bitRadius);
+      let lineB_offset = JSON.parse(JSON.stringify(lineB))
+      let i = 0;
+      i=0;  lineB_offset[i].y += bitRadius;
+      i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
+      i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
+      i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
+      i++;  lineB_offset[i].y += bitRadius;
+      passes.push({ lineStart, lineA, lineB, lineB_offset, bitRadius });
+      //=====================================================================
       // PASS 1
-      bitRadius = 1 / 2;
+      //=====================================================================
+      bitRadius = 0.381 / 2//1 / 2;
       lineA = [ // the border of the stock
         { x: 0, y: 2 }, 
         { x: -10.0, y: 2 }
@@ -44,7 +56,15 @@ export const models: {[key: string]: IModel} = {
           { x: -0.419, y: 0.7 },
           { x: -10, y: 0.7 }, 
         ];
-      passes.push({ lineStart, lineA, lineB, bitRadius });
+      lineA.forEach(it => it.y += bitRadius);
+      lineB_offset = JSON.parse(JSON.stringify(lineB));
+
+      i = 0;
+      i=0;  lineB_offset[i].y += bitRadius;
+      i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
+      i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
+      i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
+      passes.push({ lineStart, lineA, lineB, bitRadius, lineB_offset });
       
       // ------------------- 
       return passes;
@@ -74,7 +94,8 @@ export const models: {[key: string]: IModel} = {
           { x: -10, y: 0.7 },
           { x: -15.6, y: stockRadius }
         ];
-      return [{ lineStart, lineA, lineB, bitRadius }]
+      let lineB_offset = JSON.parse(JSON.stringify(lineB))
+      return [{ lineStart, lineA, lineB, lineB_offset, bitRadius }]
     }
   }
 }
