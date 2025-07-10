@@ -20,6 +20,8 @@ html, body {
   background: #222;
   color: #fff;
   z-index: 1;
+  display: flex;
+  gap: 5px;
 }
 
 .canvas {

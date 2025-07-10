@@ -1,49 +1,58 @@
 import * as THREE from 'three'
+import * as React from 'react'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { useEffect, useRef } from 'react'
 import styles from './app.module.scss'
-import { getLines } from './toolpath'
+import { getLines, type ILinesGotten } from './toolpath'
 import { STLLoader } from 'three-stdlib';
 
-let scene: THREE.Scene;
-
+let scene: THREE.Scene; 
+const hexs = [0x5ba5dd, 0x5ba5dd, 0xe69d9d]
 function App() {
+  const [bitRadius, setBitRadius] = React.useState(3.175 / 2)
+  const [stepOver, setStepOver] = React.useState(0.5) // 0.04
+  const [stockRadius, setStockRadius] = React.useState(6 / 2)
+  const [lines, setLines] = React.useState<ILinesGotten>()
   const mountRef = useRef<HTMLDivElement>(null)
+  const toolpathGroupRef = useRef<THREE.Group | null>(null);
 
-  const createLine = (p: PointXY, radius: number) => {
+  const createLine = (p: THREE.Vector3, radius: number, color=0xffffff) => {
     const ringGeom = new THREE.RingGeometry(radius - 0.01, radius, 512);
-    const ringMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 });
+    const ringMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.05 });
     const ring = new THREE.Line(ringGeom, ringMat);
     ring.position.set(p.x, p.y, 0.02); // offset slightly in Z to avoid z-fighting
-    scene.add(ring);
+    toolpathGroupRef.current!.add(ring);
   }
   const draw = () => {
-    const stockRadius = 3;
-    const bitRadius = 3.175 / 2;
-    const stepOver = 0.5 // 0.025
-    const lines = getLines({bitRadius, stockRadius, stepOver});
-    if (!scene) return;
+    if (!lines) { return; }
+    if (!scene) return; 
+    if (toolpathGroupRef.current) {
+      scene.remove(toolpathGroupRef.current);
+    }
+    toolpathGroupRef.current = new THREE.Group();
 
+    loadMesh()
+    const morphedLines = convertToVector3(lines.morphedLines);
 
     // Render morphedLines with progressively lighter color
-    lines.morphedLines.forEach((line, index) => {
-      const t = index / lines.morphedLines.length
+    morphedLines.forEach((points, index) => {
+      const t = index / morphedLines.length
       const color = new THREE.Color().lerpColors(
         new THREE.Color(0xd72c12),
         new THREE.Color(0xffff00),
         t
       )
-      const material = new THREE.LineBasicMaterial({ color })
-      const points = line.map(p => new THREE.Vector3(p.x, p.y, 0.01))
+      const material = new THREE.LineBasicMaterial({ color }) 
       const geometry = new THREE.BufferGeometry().setFromPoints(points)
       const lineMesh = new THREE.Line(geometry, material)
-      scene.add(lineMesh);
+      toolpathGroupRef.current!.add(lineMesh);
       // Draw a translucent circle at each point
 
-      line.forEach((p) => {
+      points.forEach((p) => {
         createLine(p, 0.05)
-        // if (index > 0 && index < line.length - 1) { return }
-        createLine(p, bitRadius)
+        if (index <= 1 || index === points.length - 1) { 
+          createLine(p, bitRadius, hexs[index] || hexs[hexs.length-1])
+        }
       }); 
     })
 
@@ -52,42 +61,56 @@ function App() {
       const points = line.map(p => new THREE.Vector3(p.x, p.y, 0.03));
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
       const lineMesh = new THREE.Line(geometry, material);
-      scene.add(lineMesh); 
+      toolpathGroupRef.current!.add(lineMesh); 
     });
- 
+
+    scene.add(toolpathGroupRef.current);
   }
   const loadMesh = () => {
     // after you create scene, camera, renderer, etc.
     const loader = new STLLoader();
       loader.load('m=0.13 Z=112.stl', geometry => {
-    geometry.computeVertexNormals();          // lighting looks nicer
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xcccccc,
-      metalness: 0.0,
-      roughness: 0.8,
+      geometry.computeVertexNormals();          // lighting looks nicer
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xcccccc,
+        metalness: 0.0,
+        roughness: 0.8,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+
+      const box = new THREE.Box3().setFromObject(mesh);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      console.log(`STL bounds: ${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)} mm`);
+
+      // ── 2️⃣  Centre the mesh on origin but **do not scale** ────────────────
+      // Shift so the **far‑right (max X) mid‑height, mid‑depth** becomes origin
+      const centre = new THREE.Vector3(
+        box.max.x,                               // far right in X
+        (box.min.y + box.max.y) / 2,            // middle of Y
+        (box.min.z + box.max.z) / 2             // middle of Z
+      );
+      mesh.position.sub(centre);                // translate so that point → (0,0,0)
+
+      // ── 3️⃣  Optionally: adjust camera/frustum later to fit the bbox ──────
+      // (camera logic stays where it is; it will already see the object).
+
+      toolpathGroupRef.current!.add(mesh);
     });
-    const mesh = new THREE.Mesh(geometry, material);
-
-    const box = new THREE.Box3().setFromObject(mesh);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    console.log(`STL bounds: ${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)} mm`);
-
-    // ── 2️⃣  Centre the mesh on origin but **do not scale** ────────────────
-    // Shift so the **far‑right (max X) mid‑height, mid‑depth** becomes origin
-    const centre = new THREE.Vector3(
-      box.max.x,                               // far right in X
-      (box.min.y + box.max.y) / 2,            // middle of Y
-      (box.min.z + box.max.z) / 2             // middle of Z
-    );
-    mesh.position.sub(centre);                // translate so that point → (0,0,0)
-
-    // ── 3️⃣  Optionally: adjust camera/frustum later to fit the bbox ──────
-    // (camera logic stays where it is; it will already see the object).
-
-    scene.add(mesh);
-  });
   }
+  const clearToolPathFromView = () => {
+    if (!toolpathGroupRef.current) { return; }
+    scene.remove(toolpathGroupRef.current);
+    toolpathGroupRef.current = null;
+  }
+  React.useEffect(() => {
+    if (!scene) return;
+    if (!lines) {
+      clearToolPathFromView()
+      return;
+    }
+    draw();
+  }, [lines]);
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -102,7 +125,6 @@ function App() {
     dir.position.set(1, 1, 1);   // from above‑right‑front
     scene.add(dir);
 
-    loadMesh()
     // Orthographic camera setup
     const aspect = mount.clientWidth / mount.clientHeight
     const frustumSize = 100
@@ -128,8 +150,8 @@ function App() {
     controls.enablePan = true
     controls.zoomToCursor = true;
     controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE
-    controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY
-    controls.mouseButtons.RIGHT = THREE.MOUSE.PAN
+    controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN
+    controls.mouseButtons.RIGHT = THREE.MOUSE.DOLLY
     controls.update();
 
     // Add grid helper
@@ -149,7 +171,9 @@ function App() {
       renderer.render(scene, camera)
     }
     animate()
-    draw()
+
+
+    setLines(getLines({bitRadius, stockRadius, stepOver})); 
     return () => {
       mount.removeChild(renderer.domElement)
     }
@@ -157,6 +181,37 @@ function App() {
 return (
   <div className={styles.container}>
     <div className={styles.header}>
+      <label>
+        Bit Radius:
+        <input
+          type="number"
+          value={bitRadius}
+          step="0.01"
+          min="0"
+          onChange={(e) => setBitRadius(parseFloat(e.target.value))}
+        />
+      </label>
+      <label>
+        Step Over:
+        <input
+          type="number"
+          value={stepOver}
+          step="0.01"
+          min="0"
+          onChange={(e) => setStepOver(parseFloat(e.target.value))}
+        />
+      </label>
+      <label>
+        Stock Radius:
+        <input
+          type="number"
+          value={stockRadius}
+          step="0.01"
+          min="0"
+          onChange={(e) => setStockRadius(parseFloat(e.target.value))}
+        />
+      </label>
+      <button onClick={() => clearToolPathFromView()}>Clear stage</button>
       <button onClick={() => draw()}>Generate Toolpath</button>
     </div>
     <div ref={mountRef} className={styles.canvas} />
@@ -166,6 +221,9 @@ return (
 
 export default App
 
+const convertToVector3 = (lines: PointXY[][]) => {
+  return lines.map(line => line.map(pt => new THREE.Vector3(pt.x, pt.y, 0.01)))
+}
 function closestPointOnSegment(p: PointXY, a: PointXY, b: PointXY): PointXY {
   const abx = b.x - a.x
   const aby = b.y - a.y
