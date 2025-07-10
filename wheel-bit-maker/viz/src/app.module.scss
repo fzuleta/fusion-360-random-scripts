@@ -1,0 +1,28 @@
+html, body {
+  margin: 0;
+  padding: 0;
+}
+#root {
+}
+
+.container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 10px;
+  background: #222;
+  color: #fff;
+  z-index: 1;
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+}
