@@ -1,20 +1,19 @@
 import * as THREE from 'three'
 import * as React from 'react'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { useEffect, useRef } from 'react'
 import styles from './app.module.scss'
 import { getLines, type ILinesGotten } from './toolpath'
 import { STLLoader } from 'three-stdlib';
-
-let scene: THREE.Scene;
+ 
 const hexs = [0x5ba5dd, 0x5ba5dd, 0xe69d9d]
 function App() {
-  const [bitRadius, setBitRadius] = React.useState(3.175 / 2)
-  const [stepOver, setStepOver] = React.useState(0.5) // 0.04
-  const [stockRadius, setStockRadius] = React.useState(6 / 2)
-  const [lines, setLines] = React.useState<ILinesGotten>()
-  const mountRef = useRef<HTMLDivElement>(null)
-  const toolpathGroupRef = useRef<THREE.Group | null>(null);
+  const [bitRadius, setBitRadius] = React.useState(3.175 / 2);
+  const [stepOver, setStepOver] = React.useState(0.04);
+  const [stockRadius, setStockRadius] = React.useState(6 / 2);
+  const [lines, setLines] = React.useState<ILinesGotten>();
+  const mountRef = React.useRef<HTMLDivElement>(null);
+  const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
+  const toolpathGroupRef = React.useRef<THREE.Group | null>(null);
 
   const createLine = (p: THREE.Vector3, radius: number, color=0xffffff) => {
     const ringGeom = new THREE.RingGeometry(radius - 0.01, radius, 512);
@@ -25,9 +24,9 @@ function App() {
   }
   const draw = () => {
     if (!lines) { return; }
-    if (!scene) return; 
+    if (!sceneRef.current) return; 
     if (toolpathGroupRef.current) {
-      scene.remove(toolpathGroupRef.current);
+      sceneRef.current.remove(toolpathGroupRef.current);
     }
     toolpathGroupRef.current = new THREE.Group();
 
@@ -50,7 +49,7 @@ function App() {
 
       points.forEach((p) => {
         createLine(p, 0.05)
-        if (index <= 1 || index === points.length - 1) { 
+        if (index <= 1 || index === points.length - 2) { 
           createLine(p, bitRadius, hexs[index] || hexs[hexs.length-1])
         }
       }); 
@@ -64,10 +63,10 @@ function App() {
       toolpathGroupRef.current!.add(lineMesh); 
     });
 
-    scene.add(toolpathGroupRef.current);
+    sceneRef.current.add(toolpathGroupRef.current);
   }
   const loadMesh = () => {
-    // after you create scene, camera, renderer, etc.
+    // after you create sceneRef.current, camera, renderer, etc.
     const loader = new STLLoader();
       loader.load('m=0.13 Z=112.stl', geometry => {
       geometry.computeVertexNormals();          // lighting looks nicer
@@ -99,31 +98,32 @@ function App() {
     });
   }
   const clearToolPathFromView = () => {
+    if (!sceneRef.current) { return; }
     if (!toolpathGroupRef.current) { return; }
-    scene.remove(toolpathGroupRef.current);
+    sceneRef.current.remove(toolpathGroupRef.current);
     toolpathGroupRef.current = null;
   }
   React.useEffect(() => {
-    if (!scene) return;
+    if (!sceneRef.current) return;
     if (!lines) {
       clearToolPathFromView()
       return;
     }
     draw();
   }, [lines]);
-  useEffect(() => {
+  React.useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
 
-    scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x444444) // dark gray
+    sceneRef.current = new THREE.Scene()
+    sceneRef.current.background = new THREE.Color(0x444444) // dark gray
     // ── Lights ────────────────────────────────────────────────────────────
     const ambient = new THREE.AmbientLight(0xffffff, 0.6); // soft white
-    scene.add(ambient);
+    sceneRef.current.add(ambient);
 
     const dir = new THREE.DirectionalLight(0xffffff, 0.4);
     dir.position.set(1, 1, 1);   // from above‑right‑front
-    scene.add(dir);
+    sceneRef.current.add(dir);
 
     // Orthographic camera setup
     const aspect = mount.clientWidth / mount.clientHeight
@@ -158,17 +158,17 @@ function App() {
     const gridHelper = new THREE.GridHelper(100, 100, 0x333333, 0x333333)
     gridHelper.rotation.x = Math.PI / 2 // rotate from XZ to XY
 
-    scene.add(gridHelper)
+    sceneRef.current.add(gridHelper)
 
     // Add coordinate axes helper
     const axesHelper = new THREE.AxesHelper(1)
     axesHelper.translateZ(0.01)
-    scene.add(axesHelper)
+    sceneRef.current.add(axesHelper)
 
     const animate = () => {
       requestAnimationFrame(animate)
       controls.update()
-      renderer.render(scene, camera)
+      renderer.render(sceneRef.current, camera)
     }
     animate()
 
