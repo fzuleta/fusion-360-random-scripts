@@ -4,11 +4,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import styles from './app.module.scss'
 import { getLines, type ILinesGotten } from './toolpath'
 import { STLLoader } from 'three-stdlib';
+import { models } from './data';
  
 function App() {
-  const [bitRadius, setBitRadius] = React.useState(3.175 / 2);
+  const [pass, setPass] = React.useState(0);
   const [stepOver, setStepOver] = React.useState(0.04);
   const [stockRadius, setStockRadius] = React.useState(6 / 2);
+  const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
+  const [bitRadius, setBitRadius] = React.useState(modelBit.getPasses(stockRadius)[0].bitRadius);
   const [lines, setLines] = React.useState<ILinesGotten>();
   const mountRef = React.useRef<HTMLDivElement>(null);
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
@@ -48,8 +51,7 @@ function App() {
 
       points.forEach((p) => {
         if (index <= 1 || index === morphedLines.length - 1) { 
-          createLine(p, 0.05, new THREE.Color(0xffffff));
-          console.log(index, morphedLines.length)
+          createLine(p, 0.05, new THREE.Color(0xffffff)); 
           createLine(p, bitRadius, color)
         }
       }); 
@@ -68,7 +70,7 @@ function App() {
   const loadMesh = () => {
     // after you create sceneRef.current, camera, renderer, etc.
     const loader = new STLLoader();
-      loader.load('m=0.13 Z=112.stl', geometry => {
+      loader.load(modelBit.filename, geometry => {
       geometry.computeVertexNormals();          // lighting looks nicer
       const material = new THREE.MeshStandardMaterial({
         color: 0xcccccc,
@@ -97,12 +99,13 @@ function App() {
       toolpathGroupRef.current!.add(mesh);
     });
   }
+  const loadLines = () => setLines(getLines({stepOver, ...modelBit.getPasses(stockRadius)[pass]})); 
   const clearToolPathFromView = () => {
     if (!sceneRef.current) { return; }
     if (!toolpathGroupRef.current) { return; }
     sceneRef.current.remove(toolpathGroupRef.current);
     toolpathGroupRef.current = null;
-  }
+  } 
   React.useEffect(() => {
     if (!sceneRef.current) return;
     if (!lines) {
@@ -111,6 +114,18 @@ function App() {
     }
     draw();
   }, [lines]);
+  React.useEffect(() => {
+    console.log("PASS", pass, modelBit.getPasses(stockRadius)[pass])
+    if (!sceneRef.current) return; 
+    setBitRadius(modelBit.getPasses(stockRadius)[pass].bitRadius)
+    loadLines();
+  }, [pass]);
+  React.useEffect(() => {
+    if (!sceneRef.current) return;
+    setPass(0);
+    setBitRadius(modelBit.getPasses(stockRadius)[0].bitRadius)
+    loadLines();
+  }, [modelBit]);
   React.useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -173,7 +188,7 @@ function App() {
     animate()
 
 
-    setLines(getLines({bitRadius, stockRadius, stepOver})); 
+    loadLines();
     return () => {
       mount.removeChild(renderer.domElement)
     }
@@ -182,15 +197,32 @@ return (
   <div className={styles.container}>
     <div className={styles.header}>
       <label>
-        Bit Radius:
-        <input
-          type="number"
-          value={bitRadius}
-          step="0.01"
-          min="0"
-          onChange={(e) => setBitRadius(parseFloat(e.target.value))}
-        />
+        Model:
+        <select
+          value={Object.keys(models).find((key) => models[key] === modelBit)}
+          onChange={(e) => {
+            clearToolPathFromView(); 
+            setModelBit(models[e.target.value]);
+          }}
+        >
+          {Object.keys(models).map((key) => (
+            <option key={key} value={key}>{key}</option>
+          ))}
+        </select>
       </label>
+
+      <label>
+        Pass:
+        <select
+          value={pass}
+          onChange={(e) => setPass(parseInt(e.target.value))}
+        >
+          {modelBit.getPasses(stockRadius).map((_, index) => (
+            <option key={index} value={index}>Pass {index + 1}</option>
+          ))}
+        </select>
+      </label>
+      
       <label>
         Step Over:
         <input
@@ -211,10 +243,10 @@ return (
           onChange={(e) => setStockRadius(parseFloat(e.target.value))}
         />
       </label>
-      <button onClick={() => clearToolPathFromView()}>Clear stage</button>
+      {/* <button onClick={() => clearToolPathFromView()}>Clear stage</button> */}
       <button onClick={() => {
         clearToolPathFromView(); 
-        requestAnimationFrame(() => setLines(getLines({bitRadius, stockRadius, stepOver})))
+        requestAnimationFrame(() => loadLines())
       }}>Generate Toolpath</button>
     </div>
     <div ref={mountRef} className={styles.canvas} />
