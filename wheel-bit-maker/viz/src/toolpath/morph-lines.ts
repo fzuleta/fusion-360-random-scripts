@@ -17,8 +17,27 @@ export function morphLines(props: {
   let A = lineA.length === targetCount ? lineA : resampleLine(lineA, lineB);
   let B = lineB.length === targetCount ? lineB : resampleLine(lineB, lineA);
 
-  A = offsetLineConsideringBitRadius(normalizeLineDirectionRightToLeft(A), bitRadius);
-  B = offsetLineConsideringBitRadius(normalizeLineDirectionRightToLeft(B), bitRadius);
+  A = normalizeLineDirectionRightToLeft(
+        offsetLineConsideringBitRadius(
+          densifyLine(
+            normalizeLineDirectionRightToLeft(A)
+            , 5)
+         , bitRadius
+        )
+      );
+
+  B = normalizeLineDirectionRightToLeft(
+        offsetLineConsideringBitRadius(
+          densifyLine(
+            normalizeLineDirectionRightToLeft(B)
+            , 5)
+          , bitRadius
+        )
+      );
+
+  const newTarget = Math.max(A.length, B.length);
+  if (A.length !== newTarget) A = resampleLine(A, B);
+  if (B.length !== newTarget) B = resampleLine(B, A);
 
   const maxDeltaY = Math.max(
     ...A.map((p, i) => Math.abs(B[i].y - p.y))
@@ -76,7 +95,7 @@ export function resampleLine(line: PointXY[], referenceLine?: PointXY[]): PointX
     cumulative.push(totalLength);
   }
 
-  const targetCount = referenceLine?.length ?? line.length;
+  const targetCount = (referenceLine as PointXY[] | undefined)?.length ?? line.length;
   const result: PointXY[] = [];
   const step = totalLength / (targetCount - 1);
   let currentDist = 0;
@@ -107,6 +126,41 @@ export function resampleLine(line: PointXY[], referenceLine?: PointXY[]): PointX
   return result;
 }
 
+/**
+ * Subdivide each segment so that no segment is longer than `maxSeg`.
+ * This helps the offset algorithm approximate curvature more accurately.
+ */
+const densifyLine = (line: PointXY[], maxSeg: number): PointXY[] => {
+  if (line.length < 2) return [...line];
+
+  const dense: PointXY[] = [];
+  const isClosed =
+    line[0].x === line[line.length - 1].x &&
+    line[0].y === line[line.length - 1].y;
+
+  const loopEnd = isClosed ? line.length : line.length - 1;
+
+  for (let i = 0; i < loopEnd; i++) {
+    const p0 = line[i];
+    const p1 = i === line.length - 1 ? line[0] : line[i + 1];
+
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const dist = Math.hypot(dx, dy);
+    const segments = Math.max(1, Math.ceil(dist / maxSeg));
+
+    for (let s = 0; s < segments; s++) {
+      const t = s / segments;
+      dense.push({
+        x: p0.x + dx * t,
+        y: p0.y + dy * t,
+      });
+    }
+  }
+
+  dense.push(isClosed ? dense[0] : line[line.length - 1]);
+  return dense;
+};
 export function generateGCodeFromMorph(props: {
   morphLines: PointXY[][],
   stockRadius: number,
@@ -153,37 +207,53 @@ export function generateGCodeFromMorph(props: {
   return lines;
 }
 
-
-const offsetLineConsideringBitRadius = (line: PointXY[], radius: number) => {
+/**
+ * Offset a poly-line by `radius` using the bisector-normal method.
+ * No “outward = +Y” hack – the normal’s full X/Y is retained.
+ */
+export function offsetLineConsideringBitRadius(
+  line: PointXY[],
+  radius: number
+): PointXY[] {
+  return line;
   if (line.length < 2) return [...line];
 
-  const offsetLine: PointXY[] = [];
+  const isClosed =
+    line[0].x === line[line.length - 1].x &&
+    line[0].y === line[line.length - 1].y;
 
-  for (let i = 0; i < line.length; i++) {
-    const p = line[i];
-    const prev = line[i - 1] ?? line[i];
-    const next = line[i + 1] ?? line[i];
+  const at = (i: number) =>
+    isClosed
+      ? line[(i + line.length) % line.length]
+      : line[Math.max(0, Math.min(i, line.length - 1))];
 
-    // Compute tangent direction
-    const dx = next.x - prev.x;
-    const dy = next.y - prev.y;
-    const len = Math.hypot(dx, dy) || 1;
+  return line.map((p, i) => {
+    const pPrev = at(i - 1);
+    const pNext = at(i + 1);
 
-    // Compute normal
-    let nx = -dy / len;
-    let ny = dx / len;
+    // Adjacent vectors
+    const v1x = p.x - pPrev.x;
+    const v1y = p.y - pPrev.y;
+    const v2x = pNext.x - p.x;
+    const v2y = pNext.y - p.y;
 
-    // Flip normal if it would move downward in Y
-    if (ny < 0) {
-      nx = -nx;
-      ny = -ny;
+    // Unit normals for each segment (rotate left 90°)
+    const len1 = Math.hypot(v1x, v1y) || 1;
+    const len2 = Math.hypot(v2x, v2y) || 1;
+    let nx = -(v1y / len1) - (v2y / len2);
+    let ny =  (v1x / len1) + (v2x / len2);
+
+    // Collinear fallback
+    if (nx === 0 && ny === 0) {
+      nx = -v1y / len1;
+      ny =  v1x / len1;
     }
 
-    offsetLine.push({
-      x: p.x + radius * nx,
-      y: p.y + radius * ny,
-    });
-  }
-
-  return offsetLine;
+    // Normalise
+    const nLen = Math.hypot(nx, ny);
+    return {
+      x: p.x + (radius * nx) / nLen,
+      y: p.y + (radius * ny) / nLen,
+    };
+  });
 }
