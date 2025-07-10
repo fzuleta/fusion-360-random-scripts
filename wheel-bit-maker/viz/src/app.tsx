@@ -168,7 +168,7 @@ function App() {
     const animate = () => {
       requestAnimationFrame(animate)
       controls.update()
-      renderer.render(sceneRef.current, camera)
+      renderer.render(sceneRef.current!, camera)
     }
     animate()
 
