@@ -6,7 +6,7 @@ import styles from './app.module.scss'
 import { getLines, type ILinesGotten } from './toolpath'
 import { STLLoader } from 'three-stdlib';
 
-let scene: THREE.Scene; 
+let scene: THREE.Scene;
 const hexs = [0x5ba5dd, 0x5ba5dd, 0xe69d9d]
 function App() {
   const [bitRadius, setBitRadius] = React.useState(3.175 / 2)
@@ -212,7 +212,10 @@ return (
         />
       </label>
       <button onClick={() => clearToolPathFromView()}>Clear stage</button>
-      <button onClick={() => draw()}>Generate Toolpath</button>
+      <button onClick={() => {
+        clearToolPathFromView(); 
+        requestAnimationFrame(() => setLines(getLines({bitRadius, stockRadius, stepOver})))
+      }}>Generate Toolpath</button>
     </div>
     <div ref={mountRef} className={styles.canvas} />
   </div>
