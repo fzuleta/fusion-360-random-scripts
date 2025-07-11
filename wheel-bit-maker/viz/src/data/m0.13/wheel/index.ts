@@ -47,7 +47,7 @@ export const pointsForTooth: ITeethPoint[] = [
   }, 
   { // left base
     from: { x: 0.209, y: bottomCut - 0.1, z: 0 },
-    to: { x: -1, y: -0.6, z: 0},
+    to: { x: -1, y: bottomCut - 0.1, z: 0},
   },
  
 ].map(it => {
@@ -66,9 +66,11 @@ export const pointsForTooth: ITeethPoint[] = [
 export const getPasses = (stockRadius: number) => {
   const passes: any = [];
   const z = 0;
-  // Pass 0
+  //=====================================================================
+  // PASS 0
+  //=====================================================================
   let bitRadius = 3.175 / 2;
-  console.log('Getting m0.13 Z112')
+  // console.log('Getting m0.13 Z112')
   const safeX = (bitRadius + (bitRadius*0.1));
   const safeY = (stockRadius + bitRadius + 2);
   const lineStart = [

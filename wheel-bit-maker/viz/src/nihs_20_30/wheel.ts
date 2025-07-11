@@ -16,13 +16,21 @@ const convertToSegments = (pointsTooth: ITeethPoint[]): Segment[] => {
     if (pt.center) {
       const center = new THREE.Vector2(pt.center.x, pt.center.y);
       const radius = center.distanceTo(from);
-      const angle1 = Math.atan2(from.y - center.y, from.x - center.x);
-      const angle2 = Math.atan2(to.y - center.y, to.x - center.x);
-      const delta = pt.center.anticlockwise ? 
-        (angle1 - angle2 + Math.PI * 2) % (Math.PI * 2) : 
-        (angle2 - angle1 + Math.PI * 2) % (Math.PI * 2);
+
+      const v1 = from.clone().sub(center);
+      const v2 = to.clone().sub(center);
+      const cross = v1.x * v2.y - v1.y * v2.x;
+      const anticlock = pt.center.anticlockwise // cross > 0; // <-- automatic
+
+      const angle1 = Math.atan2(v1.y, v1.x);
+      const angle2 = Math.atan2(v2.y, v2.x);
+      const delta  = anticlock
+          ? (angle1 - angle2 + Math.PI * 2) % (Math.PI * 2)
+          : (angle2 - angle1 + Math.PI * 2) % (Math.PI * 2);
+
+      console.log(anticlock, pt.center.anticlockwise)
       const length = radius * delta;
-      return { type: 'arc', from, to, center, anticlockwise: pt.center.anticlockwise, length };
+      return { type: 'arc', from, to, center, anticlockwise: anticlock, length };
     } else {
       const length = from.distanceTo(to);
       return { type: 'line', from, to, length };
@@ -111,7 +119,7 @@ const cloneSegment = (seg: Segment): Segment => ({
   anticlockwise: seg.anticlockwise,
 });
 const getSegmentsFromTo = (pathSegments: Segment[], wheelRadius: number) => {
-  const paths = pathSegments.slice(2, 10).map(it => cloneSegment(it)) // from index [3, 8]
+  const paths = pathSegments.slice(2, 9).map(it => cloneSegment(it)) // from index [3, 8]
   const p0 = cloneSegment(pathSegments[0]);
   const p1 = cloneSegment(pathSegments[1]);  
   p0.to.x -= wheelRadius; 
@@ -156,6 +164,7 @@ export function animateWheel(props: { state?: WheelAnimationState, toothAsSegmen
         return center;
       } else if (seg.type === 'arc' && seg.center) {
         const radius = seg.center.distanceTo(seg.from);
+
         const angleStart = Math.atan2(seg.from.y - seg.center.y, seg.from.x - seg.center.x);
         const angleDelta = localD / radius;
         const angle = seg.anticlockwise ? angleStart - angleDelta : angleStart + angleDelta;
