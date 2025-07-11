@@ -1,6 +1,8 @@
 import * as THREE from 'three'; 
 
 type ITeethPoint =  {from: PointXYZ, to: PointXYZ, center?: PointXYZ & {anticlockwise?: boolean}}
+
+// This draws it inverted and in 0, we then flip the Y and offset XY
 const pointsTooth: ITeethPoint[] = [
   {
     from: { x: 0, y: 1.297, z: 0},
@@ -176,16 +178,17 @@ export const getMesh = () => {
 }
 const getSegmentsFromTo = (wheelRadius: number) => {
   const paths = pathSegments.slice(3, 9) // from index [3, 8]
-  // starting point
-  const p0to = pathSegments[2].from.clone().sub(new THREE.Vector2(wheelRadius, 0));
-  const p0from = p0to.clone().sub(new THREE.Vector2(wheelRadius * 2, 0)); 
+  // starting point 
+  
+  const p0from = new THREE.Vector2(pointsTooth[2].from.x - (wheelRadius * 2) , pointsTooth[2].from.y);
+  const p0toX = pointsTooth[2].from.x - (wheelRadius);
+  const p0toY = pointsTooth[2].from.y;
+  const p0to = new THREE.Vector2(p0toX, p0toY);
   const p0: Segment = { type: 'line', from: p0from, to: p0to, length: p0from.distanceTo(p0to) }; 
   
-  const seg0 = paths[0];
-  const seg0Dir = seg0.to.clone().sub(seg0.from).normalize();
-  const seg0Normal = new THREE.Vector2(-seg0Dir.y, seg0Dir.x);
-  const p1to = seg0.from.clone().add(seg0Normal.clone().multiplyScalar(wheelRadius));
-  const p1from = p0to.clone(); 
+  const p1from = new THREE.Vector2(p0toX, p0toY);
+  const p1to = new THREE.Vector2(p0toX, paths[0].from.y);
+  
   const p1: Segment = { type: 'line', from: p1from, to: p1to, length: p1from.distanceTo(p1to) }; 
 
   paths.unshift(...[p0, p1])
