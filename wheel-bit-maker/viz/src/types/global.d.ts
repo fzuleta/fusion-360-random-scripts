@@ -23,3 +23,5 @@ declare interface MillingJob {
   targetXY: PointXY[];
   config: MillingConfig;
 }
+
+declare type ITeethPoint =  {from: PointXYZ, to: PointXYZ, center?: PointXYZ & {anticlockwise?: boolean}}

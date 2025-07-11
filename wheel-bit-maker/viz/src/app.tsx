@@ -17,7 +17,7 @@ function App() {
   const [lines, setLines] = React.useState<ILinesGotten>();
   const mountRef = React.useRef<HTMLDivElement>(null);
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
-  const toolpathGroupRef = React.useRef<THREE.Group | null>(null);
+  const toolpathGroupRef = React.useRef<THREE.Group | null>(null); 
 
   const createLine = (p: THREE.Vector3, radius: number, color: THREE.Color) => {
     const ringGeom = new THREE.RingGeometry(radius - 0.01, radius, 512);
@@ -34,7 +34,16 @@ function App() {
     }
     toolpathGroupRef.current = new THREE.Group();
 
-    loadMesh()
+    loadMesh();
+  
+    // Draw the tooth
+    const m = tooth.getMesh(modelBit.pointsForTooth);
+    toolpathGroupRef.current.add(m.group);
+    const other = otherThingsToRender;
+    other['wheel'] = () => {try { tooth.animateWheel({...m}); } catch (e) { console.error(e); }}
+    setOtherThingsToRender(other)
+
+    // draw morphed lines
     const morphedLines = convertToVector3(lines.morphedLines);
 
     // Render morphedLines with progressively lighter color
@@ -69,8 +78,7 @@ function App() {
 
     sceneRef.current.add(toolpathGroupRef.current);
   }
-  const loadMesh = () => {
-    return;
+  const loadMesh = () => { 
     // after you create sceneRef.current, camera, renderer, etc.
     const loader = new STLLoader();
       loader.load(modelBit.filename, geometry => {
@@ -109,14 +117,6 @@ function App() {
     sceneRef.current.remove(toolpathGroupRef.current);
     toolpathGroupRef.current = null;
   } 
-  const loadTooth = () => {
-    if (!sceneRef.current) return;
-    const m = tooth.getMesh();
-    sceneRef.current.add(m.group);
-    const other = otherThingsToRender;
-    other['wheel'] = () => {tooth.animateWheel({wheel: m.wheel, wheelRadius: m.wheelRadius})}
-    setOtherThingsToRender(other)
-  }
   React.useEffect(() => {
     if (!sceneRef.current) return;
     if (!lines) {
@@ -201,7 +201,6 @@ function App() {
 
 
     loadLines();
-    loadTooth();
     return () => {
       mount.removeChild(renderer.domElement)
     }
