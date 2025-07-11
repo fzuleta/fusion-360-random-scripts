@@ -70,6 +70,7 @@ function App() {
     sceneRef.current.add(toolpathGroupRef.current);
   }
   const loadMesh = () => {
+    return;
     // after you create sceneRef.current, camera, renderer, etc.
     const loader = new STLLoader();
       loader.load(modelBit.filename, geometry => {

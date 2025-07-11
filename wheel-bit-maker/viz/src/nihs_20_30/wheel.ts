@@ -2,64 +2,52 @@ import * as THREE from 'three';
 
 type ITeethPoint =  {from: PointXYZ, to: PointXYZ, center?: PointXYZ & {anticlockwise?: boolean}}
 
-// This draws it inverted and in 0, we then flip the Y and offset XY
+const bottomCut = -0.6
 const pointsTooth: ITeethPoint[] = [
-  {
-    from: { x: 0, y: 1.297, z: 0},
-    to: { x: -0.209, y: 1.297, z: 0 },
+
+  { // left base
+    from: { x: -1, y: -0.6, z: 0},
+    to: { x: -0.209, y: -0.6, z: 0 },
   },
-  {
-    from: { x: -0.209, y: 1.297, z: 0 },
-    to: { x: -0.209, y: 0.335, z: 0},
+  { // from base to first arc
+    from: { x: -0.209, y: -0.6, z: 0 }, 
+    to: { x: -0.209, y: -0.335, z: 0 },
   },
-  {
-    from: { x: -0.209, y: 1.297-0.7, z: 0 }, // intermediate point
-    to: { x: -0.209, y: 0.335, z: 0},
+  { // left first arc
+    from: { x: -0.209, y: -0.335, z: 0 },
+    to: { x: -0.099, y: -0.13, z: 0},
+    center: { x: -0.359, y:-0.122, z:0, anticlockwise: false},
   },
-  {
-    from: { x: -0.209, y: 0.335, z: 0 },
-    to: { x: -0.099, y: 0.13, z: 0},
-    center: { x: -0.359,y:0.122, z:0, anticlockwise: false},
+  { // left line between arcs
+    from: { x: -0.099, y: -0.13, z: 0},
+    to: { x: -0.099, y: -0.096, z: 0 },
   },
-  {
-    from: { x: -0.099, y: 0.13, z: 0},
-    to: { x: -0.099, y: 0.096, z: 0 },
-  },
-  {
-    from: { x: -0.099, y: 0.096, z: 0},
+  { // left tip to center
+    from: { x: -0.099, y: -0.096, z: 0},
     to: { x: 0, y: 0, z: 0},
-    center: { x: 0, y:0.099, z:0, anticlockwise: true}
+    center: { x: 0, y: -0.099, z:0, anticlockwise: true}
   },
-
-  // at 0
-
+  //
   {
     from: { x: 0, y: 0, z: 0},
-    to: { x: 0.099, y: 0.096, z: 0},
-    center: { x: 0, y: 0.099, z:0, anticlockwise: true}
+    to: { x: 0.099, y: -0.096, z: 0},
+    center: { x: 0, y: -0.099, z:0, anticlockwise: true}
   },
   {
-    from: { x: 0.099, y: 0.096, z: 0 },
-    to: { x: 0.099, y: 0.13, z: 0},
+    from: { x: 0.099, y: -0.096, z: 0 },
+    to: { x: 0.099, y: -0.13, z: 0},
   },
   {
-    from: { x: 0.099, y: 0.13, z: 0},
-    to: { x: 0.209, y: 0.335, z: 0 },
-    center: { x: 0.359, y:0.122, z:0, anticlockwise: false},
+    from: { x: 0.099, y: -0.13, z: 0},
+    to: { x: 0.209, y: -0.335, z: 0 },
+    center: { x: 0.359, y:-0.122, z:0, anticlockwise: false},
   },
 
   {
-    from: { x: 0.209, y: 0.335, z: 0},
-    to: { x: 0.209, y: 1.297-0.7, z: 0 },
-  },
-  {
-    from: { x: 0.209, y: 0.335, z: 0},
-    to: { x: 0.209, y: 1.297, z: 0 },
-  },
-  {
-    from: { x: 0.209, y: 1.297, z: 0 },
-    to: { x: 0, y: 1.297, z: 0},
-  },
+    from: { x: 0.209, y: -0.335, z: 0},
+    to: { x: 0.209, y: bottomCut - 0.1, z: 0 },
+  }, 
+ 
 ].map(it => {
   const offsetX = -0.209;
   const offsetY = 1.2970;
@@ -67,8 +55,7 @@ const pointsTooth: ITeethPoint[] = [
   [it.from, it.to, it.center].forEach(k => {
     if (!k) { return; }
     k.x += offsetX;
-    k.y -= offsetY;
-    k.y *= -1; 
+    k.y += offsetY; 
     k.z += offsetZ;
   })
   return it;
@@ -176,23 +163,29 @@ export const getMesh = () => {
   
   return {group, wheel, wheelRadius};
 }
+const cloneSegment = (seg: Segment): Segment => ({
+  from: seg.from.clone(),
+  to: seg.to.clone(),
+  type: seg.type,
+  length: seg.length,
+  center: seg.center,
+  anticlockwise: seg.anticlockwise,
+});
 const getSegmentsFromTo = (wheelRadius: number) => {
-  const paths = pathSegments.slice(3, 9) // from index [3, 8]
-  // starting point 
+  const paths = pathSegments.slice(2, 10).map(it => cloneSegment(it)) // from index [3, 8]
+  const p0 = cloneSegment(pathSegments[0]);
+  const p1 = cloneSegment(pathSegments[1]);  
+  p0.to.x -= wheelRadius; 
+  p1.from.y += wheelRadius; 
+  p1.to.y = paths[0].from.y + wheelRadius; 
   
-  const p0from = new THREE.Vector2(pointsTooth[2].from.x - (wheelRadius * 2) , pointsTooth[2].from.y);
-  const p0toX = pointsTooth[2].from.x - (wheelRadius);
-  const p0toY = pointsTooth[2].from.y;
-  const p0to = new THREE.Vector2(p0toX, p0toY);
-  const p0: Segment = { type: 'line', from: p0from, to: p0to, length: p0from.distanceTo(p0to) }; 
-  
-  const p1from = new THREE.Vector2(p0toX, p0toY);
-  const p1to = new THREE.Vector2(p0toX, paths[0].from.y);
-  
-  const p1: Segment = { type: 'line', from: p1from, to: p1to, length: p1from.distanceTo(p1to) }; 
+  paths[6].from.y += wheelRadius
 
-  paths.unshift(...[p0, p1])
-  return paths;
+  paths.unshift(...[p0, p1]);
+  return paths.map(it => {
+    it.length = it.from.distanceTo(it.to);
+    return it;
+  });
 }
 type WheelAnimationState = {
   d: number;
