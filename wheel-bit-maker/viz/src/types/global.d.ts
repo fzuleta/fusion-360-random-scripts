@@ -1,6 +1,7 @@
-declare interface PointXY {
+declare interface PointXYZ{
   x: number;
   y: number;
+  z: number;
 }
 declare interface PointXYA {
   x: number;

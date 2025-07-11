@@ -1,13 +1,13 @@
-const normalizeLineDirectionRightToLeft = (line: PointXY[]): PointXY[] => {
+const normalizeLineDirectionRightToLeft = (line: PointXYZ[]): PointXYZ[] => {
   return line[0].x >= line[line.length - 1].x ? line : [...line].reverse();
 };
 
 export function morphLines(props: {
-  lineA: PointXY[];
-  lineB: PointXY[];
+  lineA: PointXYZ[];
+  lineB: PointXYZ[];
   stepOver: number;
   bitRadius: number;
-}): PointXY[][] {
+}): PointXYZ[][] {
   let {lineA, lineB } = props;
   const { stepOver, bitRadius } = props;
   lineA = JSON.parse(JSON.stringify(lineA));
@@ -17,23 +17,17 @@ export function morphLines(props: {
   let A = lineA.length === targetCount ? lineA : resampleLine(lineA, lineB);
   let B = lineB.length === targetCount ? lineB : resampleLine(lineB, lineA);
   const subdivide = 1;
-  A = normalizeLineDirectionRightToLeft(
-        offsetLineConsideringBitRadius(
-          densifyLine(
-            normalizeLineDirectionRightToLeft(A)
-            , subdivide)
-         , bitRadius
-        )
-      );
+  A = normalizeLineDirectionRightToLeft( 
+    densifyLine(
+      normalizeLineDirectionRightToLeft(A)
+      , subdivide)
+  );
 
-  B = normalizeLineDirectionRightToLeft(
-        offsetLineConsideringBitRadius(
-          densifyLine(
-            normalizeLineDirectionRightToLeft(B)
-            , subdivide)
-          , bitRadius
-        )
-      );
+  B = normalizeLineDirectionRightToLeft( 
+    densifyLine(
+      normalizeLineDirectionRightToLeft(B)
+      , subdivide) 
+  );
 
   const newTarget = Math.max(A.length, B.length);
   if (A.length !== newTarget) A = resampleLine(A, B);
@@ -44,13 +38,14 @@ export function morphLines(props: {
   );
   const steps = Math.ceil(maxDeltaY / stepOver);
 
-  const result: PointXY[][] = [];
+  const result: PointXYZ[][] = [];
 
   for (let step = 0; step <= steps; step++) {
     const t = step / steps;
-    const line: PointXY[] = A.map((p, i) => ({
+    const line: PointXYZ[] = A.map((p, i) => ({
       x: p.x + (B[i].x - p.x) * t,
       y: p.y + (B[i].y - p.y) * t,
+      z: 0,
     }));
     result.push(line);
   }
@@ -58,13 +53,13 @@ export function morphLines(props: {
   return result;
 }
 
-export function resampleLine(line: PointXY[], referenceLine?: PointXY[]): PointXY[] {
+export function resampleLine(line: PointXYZ[], referenceLine?: PointXYZ[]): PointXYZ[] {
   if (line.length < 2) throw new Error("Line must have at least 2 points");
 
   if (referenceLine) {
     // Sort original line by X to ensure monotonicity
     const sorted = [...line].sort((a, b) => a.x - b.x);
-    const result: PointXY[] = [];
+    const result: PointXYZ[] = [];
 
     for (const ref of referenceLine) {
       let i = 0;
@@ -75,7 +70,7 @@ export function resampleLine(line: PointXY[], referenceLine?: PointXY[]): PointX
 
       const t = (ref.x - p0.x) / (p1.x - p0.x || 1);
       const y = p0.y + (p1.y - p0.y) * t;
-      result.push({ x: ref.x, y });
+      result.push({ x: ref.x, y, z: 0 });
     }
 
     return result;
@@ -95,8 +90,8 @@ export function resampleLine(line: PointXY[], referenceLine?: PointXY[]): PointX
     cumulative.push(totalLength);
   }
 
-  const targetCount = (referenceLine as PointXY[] | undefined)?.length ?? line.length;
-  const result: PointXY[] = [];
+  const targetCount = (referenceLine as PointXYZ[] | undefined)?.length ?? line.length;
+  const result: PointXYZ[] = [];
   const step = totalLength / (targetCount - 1);
   let currentDist = 0;
   let segIndex = 0;
@@ -118,6 +113,7 @@ export function resampleLine(line: PointXY[], referenceLine?: PointXY[]): PointX
     result.push({
       x: segStart.x + (segEnd.x - segStart.x) * t,
       y: segStart.y + (segEnd.y - segStart.y) * t,
+      z: 0,
     });
 
     currentDist += step;
@@ -130,10 +126,10 @@ export function resampleLine(line: PointXY[], referenceLine?: PointXY[]): PointX
  * Subdivide each segment so that no segment is longer than `maxSeg`.
  * This helps the offset algorithm approximate curvature more accurately.
  */
-const densifyLine = (line: PointXY[], maxSeg: number): PointXY[] => {
+const densifyLine = (line: PointXYZ[], maxSeg: number): PointXYZ[] => {
   if (line.length < 2) return [...line];
 
-  const dense: PointXY[] = [];
+  const dense: PointXYZ[] = [];
   const isClosed =
     line[0].x === line[line.length - 1].x &&
     line[0].y === line[line.length - 1].y;
@@ -154,6 +150,7 @@ const densifyLine = (line: PointXY[], maxSeg: number): PointXY[] => {
       dense.push({
         x: p0.x + dx * t,
         y: p0.y + dy * t,
+        z: 0,
       });
     }
   }
@@ -162,7 +159,7 @@ const densifyLine = (line: PointXY[], maxSeg: number): PointXY[] => {
   return dense;
 };
 export function generateGCodeFromMorph(props: {
-  morphLines: PointXY[][],
+  morphLines: PointXYZ[][],
   stockRadius: number,
   bitRadius: number,
   ZToCut: number,
@@ -205,55 +202,4 @@ export function generateGCodeFromMorph(props: {
   }
 
   return lines;
-}
-
-/**
- * Offset a poly-line by `radius` using the bisector-normal method.
- * No “outward = +Y” hack – the normal’s full X/Y is retained.
- */
-export function offsetLineConsideringBitRadius(
-  line: PointXY[],
-  radius: number
-): PointXY[] {
-  return line;
-  if (line.length < 2) return [...line];
-
-  const isClosed =
-    line[0].x === line[line.length - 1].x &&
-    line[0].y === line[line.length - 1].y;
-
-  const at = (i: number) =>
-    isClosed
-      ? line[(i + line.length) % line.length]
-      : line[Math.max(0, Math.min(i, line.length - 1))];
-
-  return line.map((p, i) => {
-    const pPrev = at(i - 1);
-    const pNext = at(i + 1);
-
-    // Adjacent vectors
-    const v1x = p.x - pPrev.x;
-    const v1y = p.y - pPrev.y;
-    const v2x = pNext.x - p.x;
-    const v2y = pNext.y - p.y;
-
-    // Unit normals for each segment (rotate left 90°)
-    const len1 = Math.hypot(v1x, v1y) || 1;
-    const len2 = Math.hypot(v2x, v2y) || 1;
-    let nx = -(v1y / len1) - (v2y / len2);
-    let ny =  (v1x / len1) + (v2x / len2);
-
-    // Collinear fallback
-    if (nx === 0 && ny === 0) {
-      nx = -v1y / len1;
-      ny =  v1x / len1;
-    }
-
-    // Normalise
-    const nLen = Math.hypot(nx, ny);
-    return {
-      x: p.x + (radius * nx) / nLen,
-      y: p.y + (radius * ny) / nLen,
-    };
-  });
 }

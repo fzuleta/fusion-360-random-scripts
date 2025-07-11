@@ -5,8 +5,10 @@ import styles from './app.module.scss'
 import { getLines, type ILinesGotten } from './toolpath'
 import { STLLoader } from 'three-stdlib';
 import { models } from './data';
+import * as tooth from './nihs_20_30/wheel';
  
 function App() {
+  const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
   const [pass, setPass] = React.useState(0);
   const [stepOver, setStepOver] = React.useState(0.04);
   const [stockRadius, setStockRadius] = React.useState(6 / 2);
@@ -106,6 +108,14 @@ function App() {
     sceneRef.current.remove(toolpathGroupRef.current);
     toolpathGroupRef.current = null;
   } 
+  const loadTooth = () => {
+    if (!sceneRef.current) return;
+    const m = tooth.getMesh();
+    sceneRef.current.add(m.group);
+    const other = otherThingsToRender;
+    other['wheel'] = () => {tooth.animateWheel({wheel: m.wheel, wheelRadius: m.wheelRadius})}
+    setOtherThingsToRender(other)
+  }
   React.useEffect(() => {
     if (!sceneRef.current) return;
     if (!lines) {
@@ -183,16 +193,18 @@ function App() {
     const animate = () => {
       requestAnimationFrame(animate)
       controls.update()
+      Object.keys(otherThingsToRender).forEach(k => otherThingsToRender[k]())
       renderer.render(sceneRef.current!, camera)
     }
     animate()
 
 
     loadLines();
+    loadTooth();
     return () => {
       mount.removeChild(renderer.domElement)
     }
-  }, [])
+  }, []);
 return (
   <div className={styles.container}>
     <div className={styles.header}>
@@ -256,17 +268,6 @@ return (
 
 export default App
 
-const convertToVector3 = (lines: PointXY[][]) => {
+const convertToVector3 = (lines: PointXYZ[][]) => {
   return lines.map(line => line.map(pt => new THREE.Vector3(pt.x, pt.y, 0.01)))
-}
-function closestPointOnSegment(p: PointXY, a: PointXY, b: PointXY): PointXY {
-  const abx = b.x - a.x
-  const aby = b.y - a.y
-  const apx = p.x - a.x
-  const apy = p.y - a.y
-  const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / (abx * abx + aby * aby)))
-  return {
-    x: a.x + abx * t,
-    y: a.y + aby * t,
-  }
 }
