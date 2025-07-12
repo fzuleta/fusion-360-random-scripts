@@ -9,7 +9,7 @@ export function morphLines(props: {
   bitRadius: number;
 }): PointXYZ[][] {
   let {lineA, lineB } = props;
-  const { stepOver, bitRadius } = props;
+  const { stepOver } = props;
   lineA = JSON.parse(JSON.stringify(lineA));
   lineB = JSON.parse(JSON.stringify(lineB));
   const targetCount = Math.max(lineA.length, lineB.length);
