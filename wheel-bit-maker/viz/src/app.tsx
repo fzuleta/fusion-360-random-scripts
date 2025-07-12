@@ -38,7 +38,7 @@ function App() {
     
     // Draw the tooth
     if (pass===2) {
-      const m = tooth.getMesh(modelBit.pointsForTooth);
+      const m = tooth.getMesh(modelBit.pointsForTooth, stepOver);
       toolpathGroupRef.current.add(m.group);
       const other = otherThingsToRender;
       other['tooth'] = () => {try { tooth.animateWheel({...m}); } catch (e) { console.error(e); }}
@@ -140,6 +140,9 @@ function App() {
     // }
     draw();
   }, [lines]);
+  React.useEffect(() => { 
+    loadLines();
+  }, [stepOver]);
   React.useEffect(() => {
     const p = modelBit.getPasses(stockRadius)[pass];
     console.log("Changing pass to: ", pass, p)
@@ -261,7 +264,7 @@ return (
           onChange={(e) => setStepOver(parseFloat(e.target.value))}
         />
       </label>
-      <label>
+      {/* <label>
         Stock Radius:
         <input
           type="number"
@@ -270,12 +273,12 @@ return (
           min="0"
           onChange={(e) => setStockRadius(parseFloat(e.target.value))}
         />
-      </label>
+      </label> */}
       {/* <button onClick={() => clearToolPathFromView()}>Clear stage</button> */}
-      <button onClick={() => {
+      {/* <button onClick={() => {
         clearToolPathFromView(); 
         requestAnimationFrame(() => loadLines())
-      }}>Generate Toolpath</button>
+      }}>Generate Toolpath</button> */}
     </div>
     <div ref={mountRef} className={styles.canvas} />
   </div>

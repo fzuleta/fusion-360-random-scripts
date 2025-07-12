@@ -44,7 +44,7 @@ const convertToSegments = (pointsTooth: ITeethPoint[]): Segment[] => {
   });
 }
 
-export const getMesh = (pointsTooth: ITeethPoint[]) => { 
+export const getMesh = (pointsTooth: ITeethPoint[], stepOver: number) => { 
   const group = new THREE.Group(); 
   const shape = new THREE.Shape();
   const toothAsSegments = convertToSegments(pointsTooth);
@@ -117,7 +117,8 @@ export const getMesh = (pointsTooth: ITeethPoint[]) => {
   // create circles 
   const allPositions: THREE.Vector3[] = []; 
   const totalLength = getSegmentsFromTo(toothAsSegments).reduce((sum, seg) => sum + seg.length, 0);
-  const state = { d: 0, speed: 0.05 };
+  const state = { d: 0, speed: stepOver };
+  defaultstate.speed = stepOver / 10;
   while (state.d < totalLength) {
     const pos = animateWheel({state, wheel, toothAsSegments});
     if (pos) allPositions.push(pos.clone()); // store a copy
