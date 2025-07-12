@@ -103,15 +103,15 @@ export const getPasses = (stockRadius: number) => {
   //=====================================================================
   bitRadius = 0.381 / 2//1 / 2;
   lineA = [ // the border of the stock
-    { x: 0, y: 2, z }, 
-    { x: -10.0, y: 2, z }
+    { x: 0, y: 1.5, z }, 
+    { x: -5.0, y: 1.5, z }
   ];
   lineB =  // the inner profile
     [
       { x: 0, y: 1.298, z },
-      { x: -0.419, y: 1.298, z },
-      { x: -0.419, y: 0.7, z },
-      { x: -10, y: 0.7, z }, 
+      { x: -0.45, y: 1.298, z },
+      { x: -0.45, y: 0.7, z },
+      { x: -5, y: 0.7, z }, 
     ];
   lineA.forEach(it => it.y += bitRadius);
   lineB_offset = JSON.parse(JSON.stringify(lineB));
