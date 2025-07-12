@@ -11,7 +11,7 @@ function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
   const [pass, setPass] = React.useState(0);
   const [stepOver, setStepOver] = React.useState(0.04);
-  const [stockRadius, setStockRadius] = React.useState(6 / 2);
+  const [stockRadius] = React.useState(6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[1]]);
   const [bitRadius, setBitRadius] = React.useState(modelBit.getPasses(stockRadius)[0].bitRadius);
   const [lines, setLines] = React.useState<ILinesGotten>();
