@@ -123,6 +123,7 @@ export const getPasses = (stockRadius: number) => {
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
   passes.push({ lineStart, lineA, lineB, bitRadius, lineB_offset });
   
+  passes.push(undefined); // this is the tooth
   // ------------------- 
   return passes;
 }

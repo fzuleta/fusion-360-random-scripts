@@ -27,21 +27,32 @@ function App() {
     toolpathGroupRef.current!.add(ring);
   }
   const draw = () => {
-    if (!lines) { return; }
     if (!sceneRef.current) return; 
     if (toolpathGroupRef.current) {
       sceneRef.current.remove(toolpathGroupRef.current);
     }
     toolpathGroupRef.current = new THREE.Group();
+    sceneRef.current.add(toolpathGroupRef.current);
 
     loadMesh();
-  
+    
     // Draw the tooth
-    const m = tooth.getMesh(modelBit.pointsForTooth);
-    toolpathGroupRef.current.add(m.group);
+    if (pass===2) {
+      const m = tooth.getMesh(modelBit.pointsForTooth);
+      toolpathGroupRef.current.add(m.group);
+      const other = otherThingsToRender;
+      other['tooth'] = () => {try { tooth.animateWheel({...m}); } catch (e) { console.error(e); }}
+      setOtherThingsToRender(other)
+      return;
+    }
+
+    if (!lines) { return; }
+    // clear the animation
     const other = otherThingsToRender;
-    other['wheel'] = () => {try { tooth.animateWheel({...m}); } catch (e) { console.error(e); }}
-    setOtherThingsToRender(other)
+    delete other['tooth'];
+    setOtherThingsToRender(other);
+
+  
 
     // draw morphed lines
     const morphedLines = convertToVector3(lines.morphedLines);
@@ -76,7 +87,6 @@ function App() {
       toolpathGroupRef.current!.add(lineMesh); 
     });
 
-    sceneRef.current.add(toolpathGroupRef.current);
   }
   const loadMesh = () => {  
     // after you create sceneRef.current, camera, renderer, etc.
@@ -110,7 +120,12 @@ function App() {
       toolpathGroupRef.current!.add(mesh);
     });
   }
-  const loadLines = () => setLines(getLines({stepOver, ...modelBit.getPasses(stockRadius)[pass]})); 
+  const loadLines = () => {
+    const p = modelBit.getPasses(stockRadius)?.[pass];
+    console.log(`Changing lines `, p)
+    if (!p) { return setLines(undefined); }
+    setLines(getLines({stepOver, ...p})); 
+  }
   const clearToolPathFromView = () => {
     if (!sceneRef.current) { return; }
     if (!toolpathGroupRef.current) { return; }
@@ -119,16 +134,17 @@ function App() {
   } 
   React.useEffect(() => {
     if (!sceneRef.current) return;
-    if (!lines) {
-      clearToolPathFromView()
-      return;
-    }
+    // if (!lines) {
+      // clearToolPathFromView()
+      // return;
+    // }
     draw();
   }, [lines]);
   React.useEffect(() => {
-    console.log("PASS", pass, modelBit.getPasses(stockRadius)[pass])
+    const p = modelBit.getPasses(stockRadius)[pass];
+    console.log("Changing pass to: ", pass, p)
     if (!sceneRef.current) return; 
-    setBitRadius(modelBit.getPasses(stockRadius)[pass].bitRadius)
+    p && setBitRadius(p?.bitRadius)
     loadLines();
   }, [pass]);
   React.useEffect(() => {
