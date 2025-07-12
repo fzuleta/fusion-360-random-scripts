@@ -1,57 +1,56 @@
 export const filename = 'm=0.13 z=14.stl';
  
 const bottomCut = -0.6
-export const pointsForTooth: ITeethPoint[] = [
 
+export const pointsForTooth: ITeethPoint[] = [
   { // left base
-    from: { x: -1, y: bottomCut, z: 0},
-    to: { x: -0.223, y: bottomCut, z: 0 },
+    from: { x: -1,      y: 0,               z: bottomCut },
+    to:   { x: -0.223,  y: 0,               z: bottomCut },
   },
   { // from base to first arc
-    from: { x: -0.223, y: bottomCut, z: 0 }, 
-    to: { x: -0.223, y: -0.3025, z: 0 }, // base of the tooth
+    from: { x: -0.223,  y: 0,               z: bottomCut },
+    to:   { x: -0.223,  y: 0,               z: -0.3025 },   // base of the tooth
   },
   { // left first arc
-    from: { x: -0.223, y: -0.3025, z: 0 },
-    to: { x: -0.131, y: -0.218, z: 0},
-    center: { x: -0.238, y:-0.193, z:0, anticlockwise: false},
+    from:   { x: -0.223, y: 0,              z: -0.3025 },
+    to:     { x: -0.131, y: 0,              z: -0.218 },
+    center: { x: -0.238, y: 0,              z: -0.193, anticlockwise: false },
   },
   { // left line between arcs
-    from: { x: -0.131, y: -0.218, z: 0},
-    to: { x: -0.111, y: -0.089, z: 0 },
+    from: { x: -0.131,  y: 0,               z: -0.218 },
+    to:   { x: -0.111,  y: 0,               z: -0.089 },
   },
   { // left tip to center
-    from: { x: -0.111, y: -0.089, z: 0},
-    to: { x: 0, y: 0, z: 0},
-    center: { x: 0, y: -0.114, z:0, anticlockwise: true}
+    from:   { x: -0.111, y: 0,              z: -0.089 },
+    to:     { x: 0,      y: 0,              z: 0 },
+    center: { x: 0,      y: 0,              z: -0.114, anticlockwise: true },
+  },
+  { // right tip from center
+    from:   { x: 0,      y: 0,              z: 0 },
+    to:     { x: 0.111,  y: 0,              z: -0.089 },
+    center: { x: 0,      y: 0,              z: -0.114, anticlockwise: true },
   },
   {
-    from: { x: 0, y: 0, z: 0},
-    to: { x: 0.111, y: -0.089, z: 0},
-    center: { x: 0, y: -0.114, z:0, anticlockwise: true}
+    from: { x: 0.111,   y: 0,               z: -0.089 },
+    to:   { x: 0.131,   y: 0,               z: -0.218 },
   },
   {
-    from: { x: 0.111, y: -0.089, z: 0},
-    to: { x: 0.131, y: -0.218, z: 0},
+    from:   { x: 0.131, y: 0,               z: -0.218 },
+    to:     { x: 0.223, y: 0,               z: -0.3025 },
+    center: { x: 0.238, y: 0,               z: -0.193, anticlockwise: false },
   },
   {
-    from: { x: 0.131, y: -0.218, z: 0},
-    to: { x: 0.223, y: -0.3025, z: 0 },
-    center: { x: 0.238, y:-0.193, z:0, anticlockwise: false},
+    from: { x: 0.223,   y: 0,               z: -0.3025 },
+    to:   { x: 0.223,   y: 0,               z: bottomCut - 0.1 },
   },
-  {
-    from: { x: 0.223, y: -0.3025, z: 0},
-    to: { x: 0.223, y: bottomCut - 0.1, z: 0 },
-  }, 
-  { // left base
-    from: { x: 0.223, y: bottomCut - 0.1, z: 0 },
-    to: { x: -1, y: bottomCut - 0.1, z: 0},
+  { // right base
+    from: { x: 0.223,   y: 0,               z: bottomCut - 0.1 },
+    to:   { x: -1,      y: 0,               z: bottomCut - 0.1 },
   },
- 
 ].map(it => {
   const offsetX = -0.223;
-  const offsetY = 1.2970;
-  const offsetZ = 0.01;
+  const offsetY = 0;
+  const offsetZ = 1.2970;
   [it.from, it.to, it.center].forEach(k => {
     if (!k) { return; }
     k.x += offsetX;

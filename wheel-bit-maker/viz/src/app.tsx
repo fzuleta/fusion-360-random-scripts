@@ -78,7 +78,7 @@ function App() {
 
     sceneRef.current.add(toolpathGroupRef.current);
   }
-  const loadMesh = () => { 
+  const loadMesh = () => {  
     // after you create sceneRef.current, camera, renderer, etc.
     const loader = new STLLoader();
       loader.load(modelBit.filename, geometry => {
@@ -161,7 +161,7 @@ function App() {
       -frustumSize / 2,
       0.1,
       1000
-    )
+    );
     camera.position.set(0, 0, 500)
     camera.lookAt(0, 0, 0)
 

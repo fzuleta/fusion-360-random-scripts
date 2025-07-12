@@ -2,30 +2,35 @@ import * as THREE from 'three';
 
 type Segment = {
   type: 'line' | 'arc',
-  from: THREE.Vector2,
-  to: THREE.Vector2,
-  center?: THREE.Vector2,
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  center?: THREE.Vector3,
   anticlockwise?: boolean,
   length: number
 };
 
 const bit = {width: 1, height: 10}
+/** Degrees → radians. */
+export const degToRad = (deg: number): number => deg * Math.PI / 180;
+
+/** Radians → degrees. */
+export const radToDeg = (rad: number): number => rad * 180 / Math.PI;
 
 const convertToSegments = (pointsTooth: ITeethPoint[]): Segment[] => {
   return pointsTooth.map(pt => {
-    const from = new THREE.Vector2(pt.from.x, pt.from.y);
-    const to = new THREE.Vector2(pt.to.x, pt.to.y);
+    const from = new THREE.Vector3(pt.from.x, pt.from.y, pt.from.z);
+    const to = new THREE.Vector3(pt.to.x, pt.to.y, pt.to.z);
     if (pt.center) {
-      const center = new THREE.Vector2(pt.center.x, pt.center.y);
+      const center = new THREE.Vector3(pt.center.x, pt.center.y, pt.center.z);
       const radius = center.distanceTo(from);
 
       const v1 = from.clone().sub(center);
       const v2 = to.clone().sub(center);
-      const cross = v1.x * v2.y - v1.y * v2.x;        // +ve ⇒ CCW sweep
+      const cross = v1.x * v2.z - v1.z * v2.x;        // +ve ⇒ CCW sweep
       const anticlock = cross > 0;                     // true  ⇒ anticlockwise
 
-      const angle1 = Math.atan2(v1.y, v1.x);
-      const angle2 = Math.atan2(v2.y, v2.x);
+      const angle1 = Math.atan2(v1.z, v1.x);
+      const angle2 = Math.atan2(v2.z, v2.x);
       const delta  = anticlock
           ? (angle1 - angle2 + Math.PI * 2) % (Math.PI * 2)
           : (angle2 - angle1 + Math.PI * 2) % (Math.PI * 2);
@@ -43,38 +48,51 @@ export const getMesh = (pointsTooth: ITeethPoint[]) => {
   const group = new THREE.Group(); 
   const shape = new THREE.Shape();
   const toothAsSegments = convertToSegments(pointsTooth);
-  let currentPos: THREE.Vector2 | null = null;
+  let currentPos: THREE.Vector3 | null = null;
 
   toothAsSegments.forEach((pt) => {
     const from = pt.from;
     const to = pt.to;
 
     if (!currentPos) {
-      shape.moveTo(from.x, from.y);
+      shape.moveTo(from.x, from.z);
       currentPos = from.clone();
     }
 
     if (pt.center) {
-      const center = pt.center; // new THREE.Vector2(pt.center.x, pt.center.y);
+      const center = pt.center; // new THREE.Vector2(pt.center.x, pt.center.z);
       const radius = center.distanceTo(from);
-      const startAngle = Math.atan2(from.y - center.y, from.x - center.x);
-      const endAngle = Math.atan2(to.y - center.y, to.x - center.x);
+      const startAngle = Math.atan2(from.z - center.z, from.x - center.x);
+      const endAngle = Math.atan2(to.z - center.z, to.x - center.x);
       // Three.js expects a *clockwise* flag, so pass the negation.
-      shape.absarc(center.x, center.y, radius, startAngle, endAngle, !pt.anticlockwise);
+      shape.absarc(center.x, center.z, radius, startAngle, endAngle, !pt.anticlockwise);
     } else {
-      shape.lineTo(to.x, to.y);
+      shape.lineTo(to.x, to.z);
     }
 
     currentPos = to.clone();
   });
   const geometry = new THREE.ShapeGeometry(shape);
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5 })); 
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+  );
+
+  // Rotate the flat 2‑D shape so it lies in the X‑Z plane (normal +Y),
+  // and lift it a hair to avoid z‑fighting with the wheel markers.
+  mesh.rotateX( degToRad(90));
+  mesh.position.y = -0.005;            // sits flush on Y=0 plane
+
   group.add(mesh);
 
   // ── Wheel as a thin rectangle (1 mm × 0.01 mm) ─────────────── 
   const wheelGeometry = new THREE.PlaneGeometry(bit.width, bit.height);
-  // Shift geometry upward by half its height so (0,0) = centre‑bottom
-  wheelGeometry.translate(0, bit.height / 2, 0);
+
+  // Put origin on the *bottom* edge (centre‑bottom in the plane’s local XY)
+  wheelGeometry.translate(0, -bit.height / 2, 0);
+
+  // Rotate so the rectangle lies in the X‑Z plane (normal +Y)
+  wheelGeometry.rotateX(-Math.PI / 2);
 
   const wheelMaterial = new THREE.MeshBasicMaterial({ color: 0x8e98b3, side: THREE.DoubleSide });
   const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
@@ -83,21 +101,21 @@ export const getMesh = (pointsTooth: ITeethPoint[]) => {
   const wheelRadius = bit.width / 2;
 
   // Get tangent segment (points[8])
-  const pFrom = new THREE.Vector2(pointsTooth[8].from.x, pointsTooth[8].from.y);
-  const pTo = new THREE.Vector2(pointsTooth[8].to.x, pointsTooth[8].to.y);
+  const pFrom = new THREE.Vector2(pointsTooth[8].from.x, pointsTooth[8].from.z);
+  const pTo = new THREE.Vector2(pointsTooth[8].to.x, pointsTooth[8].to.z);
   const tangent = pTo.clone().sub(pFrom).normalize();
   const normal = new THREE.Vector2(-tangent.y, tangent.x); // perpendicular
 
   const contactPoint = pFrom.clone(); // contact at start of segment
   const center = contactPoint.clone().add(normal.multiplyScalar(wheelRadius));
 
-  wheel.position.set(center.x, center.y, 0.011); // Flip Y like the shape
+  wheel.position.set(center.x, 0, center.y); // Flip Y like the shape
 
   group.add(wheel);
   group.position.set(0, 0, 0.001)
 
   // create circles 
-  const allPositions: THREE.Vector2[] = []; 
+  const allPositions: THREE.Vector3[] = []; 
   const totalLength = getSegmentsFromTo(toothAsSegments).reduce((sum, seg) => sum + seg.length, 0);
   const state = { d: 0, speed: 0.05 };
   while (state.d < totalLength) {
@@ -111,7 +129,7 @@ export const getMesh = (pointsTooth: ITeethPoint[]) => {
 
   allPositions.forEach(pos => {
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-    marker.position.set(pos.x, pos.y, 0.02);
+    marker.position.set(pos.x, 0.02, pos.z);
     group.add(marker);
   });
   console.log(JSON.stringify(allPositions))
@@ -128,8 +146,8 @@ const cloneSegment = (seg: Segment): Segment => ({
 const getSegmentsFromTo = (pathSegments: Segment[]) => {
   const paths = pathSegments.slice(1, 9).map(it => cloneSegment(it));
   const p0 = cloneSegment(pathSegments[0]);
-  p0.from.sub(new THREE.Vector2(bit.width, 0))
-  p0.to = paths[0].from.clone().sub(new THREE.Vector2(bit.width, 0)); 
+  p0.from.sub(new THREE.Vector3(bit.width, 0, 0))
+  p0.to = paths[0].from.clone().sub(new THREE.Vector3(bit.width, 0, 0)); 
   paths.unshift(p0);
   return paths.map(it => {
     it.length = it.from.distanceTo(it.to);
@@ -156,7 +174,7 @@ export function animateWheel(props: { state?: WheelAnimationState, toothAsSegmen
   for (const seg of segments) {
     if (acc + seg.length >= dWrapped) {
       const localD = dWrapped - acc;
-      let pos: THREE.Vector2;
+      let pos: THREE.Vector3;
 
       // Re‑use last horizontal side unless we determine a new one
       let signX = state.lastSignX ?? -1;
@@ -167,7 +185,7 @@ export function animateWheel(props: { state?: WheelAnimationState, toothAsSegmen
         pos = seg.from.clone().add(dir.multiplyScalar(localD));
 
         // Outward normal for a left‑hand contour is (‑dir.y, dir.x)
-        const normal = new THREE.Vector2(-dir.y, dir.x).normalize();
+        const normal = new THREE.Vector2(-dir.z, dir.x).normalize();
         if (Math.abs(normal.x) > 1e-6) {
           // Usual case: outward normal has X component → pick that side
           signX = Math.sign(normal.x);
@@ -178,14 +196,15 @@ export function animateWheel(props: { state?: WheelAnimationState, toothAsSegmen
       } else if (seg.center) { /* arc */ 
         // Parametric point on the arc at arc‑length = localD
         const radius = seg.center.distanceTo(seg.from);
-        const startAngle = Math.atan2(seg.from.y - seg.center.y,
+        const startAngle = Math.atan2(seg.from.z - seg.center.z,
                                       seg.from.x - seg.center.x);
         const sweep = localD / radius * (seg.anticlockwise ? 1 : -1);
         const θ = startAngle + sweep;
 
-        pos = new THREE.Vector2(
+        pos = new THREE.Vector3(
           seg.center.x + radius * Math.cos(θ),
-          seg.center.y + radius * Math.sin(θ)
+          0,
+          seg.center.z + radius * Math.sin(θ)
         );
 
         const radial = pos.clone().sub(seg.center).normalize();
@@ -204,7 +223,7 @@ export function animateWheel(props: { state?: WheelAnimationState, toothAsSegmen
       // Apply X‑only offset
       pos.x += signX * bitWidthRadius;
 
-      wheel.position.set(pos.x, pos.y, 0.02);
+      wheel.position.set(pos.x, 0, pos.z);
       return pos;
     }
     acc += seg.length;
