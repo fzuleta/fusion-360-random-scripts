@@ -4,11 +4,11 @@ const bottomCut = -0.6
 export const pointsForTooth: ITeethPoint[] = [
 
   { // left base
-    from: { x: -1, y: -0.6, z: 0},
-    to: { x: -0.223, y: -0.6, z: 0 },
+    from: { x: -1, y: bottomCut, z: 0},
+    to: { x: -0.223, y: bottomCut, z: 0 },
   },
   { // from base to first arc
-    from: { x: -0.223, y: -0.6, z: 0 }, 
+    from: { x: -0.223, y: bottomCut, z: 0 }, 
     to: { x: -0.223, y: -0.3025, z: 0 }, // base of the tooth
   },
   { // left first arc

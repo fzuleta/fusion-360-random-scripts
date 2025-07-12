@@ -45,7 +45,7 @@ export const getMesh = (pointsTooth: ITeethPoint[]) => {
   const toothAsSegments = convertToSegments(pointsTooth);
   let currentPos: THREE.Vector2 | null = null;
 
-  toothAsSegments.forEach((pt, i) => {
+  toothAsSegments.forEach((pt) => {
     const from = pt.from;
     const to = pt.to;
 
@@ -114,7 +114,7 @@ export const getMesh = (pointsTooth: ITeethPoint[]) => {
     marker.position.set(pos.x, pos.y, 0.02);
     group.add(marker);
   });
-  
+  console.log(JSON.stringify(allPositions))
   return {group, wheel, toothAsSegments};
 }
 const cloneSegment = (seg: Segment): Segment => ({
@@ -126,7 +126,11 @@ const cloneSegment = (seg: Segment): Segment => ({
   anticlockwise: seg.anticlockwise,
 });
 const getSegmentsFromTo = (pathSegments: Segment[]) => {
-  const paths = pathSegments.slice(0, 9).map(it => cloneSegment(it))
+  const paths = pathSegments.slice(1, 9).map(it => cloneSegment(it));
+  const p0 = cloneSegment(pathSegments[0]);
+  p0.from.sub(new THREE.Vector2(bit.width, 0))
+  p0.to = paths[0].from.clone().sub(new THREE.Vector2(bit.width, 0)); 
+  paths.unshift(p0);
   return paths.map(it => {
     it.length = it.from.distanceTo(it.to);
     return it;
@@ -165,9 +169,12 @@ export function animateWheel(props: { state?: WheelAnimationState, toothAsSegmen
         // Outward normal for a left‑hand contour is (‑dir.y, dir.x)
         const normal = new THREE.Vector2(-dir.y, dir.x).normalize();
         if (Math.abs(normal.x) > 1e-6) {
+          // Usual case: outward normal has X component → pick that side
           signX = Math.sign(normal.x);
+        } else if (Math.abs(dir.x) > 1e-6) {
+          // Line is exactly horizontal ⇒ flip side based on travel direction
+          signX = Math.sign(dir.x);
         }
-        
       } else if (seg.center) { /* arc */ 
         // Parametric point on the arc at arc‑length = localD
         const radius = seg.center.distanceTo(seg.from);
