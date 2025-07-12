@@ -19,8 +19,8 @@ const convertToSegments = (pointsTooth: ITeethPoint[]): Segment[] => {
 
       const v1 = from.clone().sub(center);
       const v2 = to.clone().sub(center);
-      const cross = v1.x * v2.y - v1.y * v2.x;
-      const anticlock = pt.center.anticlockwise // cross > 0; // <-- automatic
+      const cross = v1.x * v2.y - v1.y * v2.x;        // +ve ⇒ CCW sweep
+      const anticlock = cross > 0;                     // true  ⇒ anticlockwise
 
       const angle1 = Math.atan2(v1.y, v1.x);
       const angle2 = Math.atan2(v2.y, v2.x);
@@ -28,7 +28,6 @@ const convertToSegments = (pointsTooth: ITeethPoint[]): Segment[] => {
           ? (angle1 - angle2 + Math.PI * 2) % (Math.PI * 2)
           : (angle2 - angle1 + Math.PI * 2) % (Math.PI * 2);
 
-      console.log(anticlock, pt.center.anticlockwise)
       const length = radius * delta;
       return { type: 'arc', from, to, center, anticlockwise: anticlock, length };
     } else {
@@ -44,9 +43,9 @@ export const getMesh = (pointsTooth: ITeethPoint[]) => {
   const toothAsSegments = convertToSegments(pointsTooth);
   let currentPos: THREE.Vector2 | null = null;
 
-  pointsTooth.forEach((pt, i) => {
-    const from = new THREE.Vector2(pt.from.x, pt.from.y);
-    const to = new THREE.Vector2(pt.to.x, pt.to.y);
+  toothAsSegments.forEach((pt, i) => {
+    const from = pt.from;
+    const to = pt.to;
 
     if (!currentPos) {
       shape.moveTo(from.x, from.y);
@@ -54,11 +53,12 @@ export const getMesh = (pointsTooth: ITeethPoint[]) => {
     }
 
     if (pt.center) {
-      const center = new THREE.Vector2(pt.center.x, pt.center.y);
+      const center = pt.center; // new THREE.Vector2(pt.center.x, pt.center.y);
       const radius = center.distanceTo(from);
       const startAngle = Math.atan2(from.y - center.y, from.x - center.x);
       const endAngle = Math.atan2(to.y - center.y, to.x - center.x);
-      shape.absarc(center.x, center.y, radius, startAngle, endAngle, !!pt.center.anticlockwise);
+      // Three.js expects a *clockwise* flag, so pass the negation.
+      shape.absarc(center.x, center.y, radius, startAngle, endAngle, !pt.anticlockwise);
     } else {
       shape.lineTo(to.x, to.y);
     }
@@ -165,25 +165,26 @@ export function animateWheel(props: { state?: WheelAnimationState, toothAsSegmen
       } else if (seg.type === 'arc' && seg.center) {
         const radius = seg.center.distanceTo(seg.from);
 
-        const angleStart = Math.atan2(seg.from.y - seg.center.y, seg.from.x - seg.center.x);
-        const angleDelta = localD / radius;
-        const angle = seg.anticlockwise ? angleStart - angleDelta : angleStart + angleDelta;
+        // Work out the swept angle for the current arc‑length travelled.
+        // Note: for anticlockwise arcs we need the angle to DECREASE
+        const angleStart = Math.atan2(seg.from.y - seg.center.y,
+                                      seg.from.x - seg.center.x);
+        const angleDelta = (localD / radius) * (seg.anticlockwise ? 1 : -1);
+        const angle      = angleStart + angleDelta;
+
+        // Contact point on the original profile
         const pos = new THREE.Vector2(
           seg.center.x + radius * Math.cos(angle),
           seg.center.y + radius * Math.sin(angle)
         );
-        const tangent = seg.anticlockwise ?
-          new THREE.Vector2(
-            radius * Math.sin(angle),
-            -radius * Math.cos(angle)
-          ) :
-          new THREE.Vector2(
-            -radius * Math.sin(angle),
-            radius * Math.cos(angle)
-          );
-        const normal = tangent.clone().normalize().rotateAround(new THREE.Vector2(0, 0), Math.PI / 2);
-        const contact = pos.clone().add(normal.multiplyScalar(wheelRadius));
-        wheel.position.set(contact.x, contact.y, 0.02); 
+
+        // OUTWARD radial direction (i.e. the direction the wheel’s centre must move)
+        // For clockwise arcs this is +radial, for anticlockwise arcs it is -radial.
+        const radial  = pos.clone().sub(seg.center).normalize();
+        const outward = seg.anticlockwise ? radial.clone().negate() : radial;
+        const contact = pos.clone().add(outward.multiplyScalar(wheelRadius));
+
+        wheel.position.set(contact.x, contact.y, 0.02);
         return contact;
       }
 
