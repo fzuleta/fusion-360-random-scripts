@@ -1,8 +1,10 @@
+import { cloneSegment, convertPointToSegment } from "../../../helpers";
+
 export const filename = 'm=0.13 z=14.stl';
  
 const bottomCut = -0.6
 
-export const pointsForTooth: ITeethPoint[] = [
+const _points: Segment[] = [
   { // left base
     from: { x: -1,      y: 0,               z: bottomCut },
     to:   { x: -0.223,  y: 0,               z: bottomCut },
@@ -57,8 +59,13 @@ export const pointsForTooth: ITeethPoint[] = [
     k.y += offsetY; 
     k.z += offsetZ;
   })
-  return it;
-}); 
+  return convertPointToSegment(it);
+})
+export const points: ISegments = {
+  all: _points.map(it => convertPointToSegment(cloneSegment(it))),
+  left: _points.slice(1, 5).map(it => convertPointToSegment(cloneSegment(it))),
+  right: _points.slice(5, 9).map(it => convertPointToSegment(cloneSegment(it))),
+}
 
 export const getPasses = (stockRadius: number) => {
   const passes: any = [];

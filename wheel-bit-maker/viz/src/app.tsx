@@ -38,10 +38,10 @@ function App() {
     
     // Draw the tooth
     if (pass===2) {
-      const m = tooth.getMesh(modelBit.pointsForTooth, stepOver);
+      const m = tooth.getMesh(modelBit.points, stepOver);
       toolpathGroupRef.current.add(m.group);
       const other = otherThingsToRender;
-      other['tooth'] = () => {try { tooth.animateWheel({...m}); } catch (e) { console.error(e); }}
+      other['tooth'] = () => {try { tooth.animateWheel({segments: m.segments.left, wheel: m.wheel }); } catch (e) { console.error(e); }}
       setOtherThingsToRender(other)
       return;
     }
@@ -152,7 +152,7 @@ function App() {
   }, [pass]);
   React.useEffect(() => {
     if (!sceneRef.current) return;
-    setPass(0);
+    setPass(2);
     setBitRadius(modelBit.getPasses(stockRadius)[0].bitRadius)
     loadLines();
   }, [modelBit]);

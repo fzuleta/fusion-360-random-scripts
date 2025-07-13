@@ -1,7 +1,8 @@
 import * as THREE from 'three';  
+import { degToRad } from '../helpers';
 
 type Segment = {
-  type: 'line' | 'arc',
+  type: string; //'line' | 'arc',
   from: THREE.Vector3,
   to: THREE.Vector3,
   center?: THREE.Vector3,
@@ -10,47 +11,15 @@ type Segment = {
 };
 
 const bit = {width: 1, height: 10}
-/** Degrees → radians. */
-export const degToRad = (deg: number): number => deg * Math.PI / 180;
 
-/** Radians → degrees. */
-export const radToDeg = (rad: number): number => rad * 180 / Math.PI;
-
-const convertToSegments = (pointsTooth: ITeethPoint[]): Segment[] => {
-  return pointsTooth.map(pt => {
-    const from = new THREE.Vector3(pt.from.x, pt.from.y, pt.from.z);
-    const to = new THREE.Vector3(pt.to.x, pt.to.y, pt.to.z);
-    if (pt.center) {
-      const center = new THREE.Vector3(pt.center.x, pt.center.y, pt.center.z);
-      const radius = center.distanceTo(from);
-
-      const v1 = from.clone().sub(center);
-      const v2 = to.clone().sub(center);
-      const cross = v1.x * v2.z - v1.z * v2.x;        // +ve ⇒ CCW sweep
-      const anticlock = cross > 0;                     // true  ⇒ anticlockwise
-
-      const angle1 = Math.atan2(v1.z, v1.x);
-      const angle2 = Math.atan2(v2.z, v2.x);
-      const delta  = anticlock
-          ? (angle1 - angle2 + Math.PI * 2) % (Math.PI * 2)
-          : (angle2 - angle1 + Math.PI * 2) % (Math.PI * 2);
-
-      const length = radius * delta;
-      return { type: 'arc', from, to, center, anticlockwise: anticlock, length };
-    } else {
-      const length = from.distanceTo(to);
-      return { type: 'line', from, to, length };
-    }
-  });
-}
-
-export const getMesh = (pointsTooth: ITeethPoint[], stepOver: number) => { 
+export const getMesh = (
+  segments: ISegments, 
+  stepOver: number) => { 
   const group = new THREE.Group(); 
   const shape = new THREE.Shape();
-  const toothAsSegments = convertToSegments(pointsTooth);
   let currentPos: THREE.Vector3 | null = null;
 
-  toothAsSegments.forEach((pt) => {
+  segments.all.forEach((pt) => {
     const from = pt.from;
     const to = pt.to;
 
@@ -60,7 +29,7 @@ export const getMesh = (pointsTooth: ITeethPoint[], stepOver: number) => {
     }
 
     if (pt.center) {
-      const center = pt.center; // new THREE.Vector2(pt.center.x, pt.center.z);
+      const center = pt.center;
       const radius = center.distanceTo(from);
       const startAngle = Math.atan2(from.z - center.z, from.x - center.x);
       const endAngle = Math.atan2(to.z - center.z, to.x - center.x);
@@ -101,8 +70,8 @@ export const getMesh = (pointsTooth: ITeethPoint[], stepOver: number) => {
   const wheelRadius = bit.width / 2;
 
   // Get tangent segment (points[8])
-  const pFrom = new THREE.Vector2(pointsTooth[8].from.x, pointsTooth[8].from.z);
-  const pTo = new THREE.Vector2(pointsTooth[8].to.x, pointsTooth[8].to.z);
+  const pFrom = new THREE.Vector2(segments.all[8].from.x, segments.all[8].from.z);
+  const pTo = new THREE.Vector2(segments.all[8].to.x, segments.all[8].to.z);
   const tangent = pTo.clone().sub(pFrom).normalize();
   const normal = new THREE.Vector2(-tangent.y, tangent.x); // perpendicular
 
@@ -115,45 +84,26 @@ export const getMesh = (pointsTooth: ITeethPoint[], stepOver: number) => {
   group.position.set(0, 0, 0.001)
 
   // create circles 
-  const allPositions: THREE.Vector3[] = []; 
-  const totalLength = getSegmentsFromTo(toothAsSegments).reduce((sum, seg) => sum + seg.length, 0);
+  const leftPositions: THREE.Vector3[] = []; 
+  const totalLength = segments.left.reduce((sum, seg) => sum + seg.length, 0);
   const state = { d: 0, speed: stepOver };
   defaultstate.speed = stepOver / 10;
   while (state.d < totalLength) {
-    const pos = animateWheel({state, wheel, toothAsSegments});
-    if (pos) allPositions.push(pos.clone()); // store a copy
+    const pos = animateWheel({state, wheel, segments: segments.left});
+    if (pos) leftPositions.push(pos.clone()); // store a copy
     state.d += state.speed;
   }
 
   const markerGeometry = new THREE.SphereGeometry(0.01, 8, 8);
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xff33f9 });
 
-  allPositions.forEach(pos => {
+  leftPositions.forEach(pos => {
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
     marker.position.set(pos.x, 0.02, pos.z);
     group.add(marker);
   });
-  console.log(JSON.stringify(allPositions))
-  return {group, wheel, toothAsSegments};
-}
-const cloneSegment = (seg: Segment): Segment => ({
-  from: seg.from.clone(),
-  to: seg.to.clone(),
-  type: seg.type,
-  length: seg.length,
-  center: seg.center,
-  anticlockwise: seg.anticlockwise,
-});
-const getSegmentsFromTo = (pathSegments: Segment[]) => {
-  const paths = pathSegments.slice(1, 9).map(it => cloneSegment(it));
-  const p0 = cloneSegment(pathSegments[0]);
-  p0.from.sub(new THREE.Vector3(bit.width, 0, 0))
-  p0.to = paths[0].from.clone().sub(new THREE.Vector3(bit.width, 0, 0)); 
-  paths.unshift(p0);
-  return paths.map(it => {
-    it.length = it.from.distanceTo(it.to);
-    return it;
-  });
+  console.log(JSON.stringify(leftPositions))
+  return {group, wheel, segments};
 }
 type WheelAnimationState = {
   d: number;
@@ -162,10 +112,10 @@ type WheelAnimationState = {
 };
 
 const defaultstate: WheelAnimationState = { d: 0, speed: 0.001 };
-export function animateWheel(props: { state?: WheelAnimationState, toothAsSegments: Segment[], wheel: THREE.Mesh }) {
+
+export function animateWheel(props: { state?: WheelAnimationState, segments: Segment[], wheel: THREE.Mesh }) {
   const state = props.state || defaultstate;
-  const { wheel, toothAsSegments} = props
-  const segments = getSegmentsFromTo(toothAsSegments);
+  const { wheel, segments} = props
   const totalLength = segments.reduce((sum, seg) => sum + seg.length, 0);
 
   state.d += state.speed;
