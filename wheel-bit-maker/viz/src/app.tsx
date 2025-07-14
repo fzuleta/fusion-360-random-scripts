@@ -40,6 +40,10 @@ function App() {
     if (pass === 2) {
       const m = tooth.getMesh(modelBit.points, stepOver);
       toolpathGroupRef.current.add(m.group);
+      
+
+      const bitRight = m.bit.clone()
+      m.group.add(bitRight);
 
       // ── Set‑up per‑frame state so the wheel actually advances ──────────
       const wheelState = { d: 0, speed: 0.001 };
@@ -48,11 +52,8 @@ function App() {
       other['tooth'] = () => {
         try {
           // Move the mill‑bit so its right edge follows the left‑hand path
-          tooth.animateLeftPoints({
-            state: wheelState,
-            segments: m.segments.left,
-            millBit: m.wheel,
-          });
+          tooth.animateLeftPoints({ state: wheelState, segments: m.segments.left, millBit: m.bit, });
+          tooth.animateLeftPoints({ state: wheelState, segments: m.segments.right, dir: 'R2L', millBit: bitRight, });
           // Advance along the tool‑path for the next frame
           wheelState.d += wheelState.speed;
         } catch (e) {

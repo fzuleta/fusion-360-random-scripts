@@ -127,7 +127,7 @@ export const getMesh = (segments: ISegments, stepOver: number) => {
     group.add(marker);
   });
   // console.log(JSON.stringify(leftPositions))
-  return {group, wheel, segments};
+  return {group, bit: wheel, segments};
 }
 type WheelAnimationState = {
   d: number;

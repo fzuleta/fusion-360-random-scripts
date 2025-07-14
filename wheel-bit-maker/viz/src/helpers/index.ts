@@ -44,3 +44,22 @@ export const convertPointToSegment = (point: {from: PointXYZ; to: PointXYZ; cent
   }
   return fcn(point); 
 }
+export function reverseSegmentList(raw: ITeethPoint[]): ITeethPoint[] {
+  return raw
+    .slice()               // make a shallow copy, leave original intact
+    .reverse()             // 1) walk them in the opposite order
+    .map(pt => {           // 2) flip the endpoints
+      const rev: ITeethPoint = {
+        from: { ...pt.to   },           // swap ends
+        to:   { ...pt.from },
+        center: pt.center ? { ...pt.center } : undefined,
+      };
+      if (rev.center) {
+        rev.center.anticlockwise =
+          rev.center.anticlockwise === undefined
+            ? undefined
+            : !rev.center.anticlockwise; // flip CW/CCW sense
+      }
+      return rev;
+    });
+}

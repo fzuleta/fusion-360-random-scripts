@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cloneSegment, convertPointToSegment } from "../../../helpers";
+import { cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
 
 export const filename = 'm=0.13 z=14.stl';
  
@@ -69,11 +69,16 @@ pleft0.to = pleft0.from.clone();
 pleft0.from = pleft0.from.clone().sub(new THREE.Vector3(1, 0 ,0))
 left.unshift(convertPointToSegment(pleft0));
 
-const right = _points.slice(5, 9).map(it => convertPointToSegment(cloneSegment(it)));
+// Grab the raw point objects for the right-hand profile
+const rawRight = _points.slice(5, 9).map(cloneSegment); 
+const rawRightReversed = reverseSegmentList(rawRight); 
+const right = rawRightReversed.map(convertPointToSegment);
+
+// Add the little vertical “stub” as before (already points the right way)
 const pright0 = cloneSegment(_points[9]);
 pright0.to = pright0.from.clone();
-pright0.from = pright0.from.clone().add(new THREE.Vector3(0.5, 0 ,0))
-right.unshift(convertPointToSegment(pright0));
+pright0.from = pright0.from.clone().add(new THREE.Vector3(0.5, 0, 0));
+right.unshift(pright0);
 
 export const points: ISegments = {
   all: _points.map(it => convertPointToSegment(cloneSegment(it))),
