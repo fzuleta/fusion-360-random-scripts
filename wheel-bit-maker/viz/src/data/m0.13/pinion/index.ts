@@ -66,7 +66,7 @@ const _points: Segment[] = [
 const left = _points.slice(1, 5).map(it => convertPointToSegment(cloneSegment(it)));
 let p0 = cloneSegment(_points[1]);
 p0.to = p0.from.clone();
-p0.from = p0.from.clone().sub(new THREE.Vector3(1, 0 ,0))
+p0.from = p0.from.clone().sub(new THREE.Vector3(0.5, 0 ,0))
 left.unshift(convertPointToSegment(p0));
 // point 2
 // p0 = cloneSegment(left[left.length-1]);

@@ -44,7 +44,7 @@ function App() {
     if (pass === 2) {
       const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
       toolpathGroupRef.current.add(m.group);
-      const wheelState = { i: 0, t: 0, speed: 6 };
+      const wheelState = { i: 0, t: 0, speed: 1 };
       const clock = new THREE.Clock();
 
       const other = otherThingsToRender;
@@ -63,7 +63,7 @@ function App() {
         const a = m.path[wheelState.i];
         const b = m.path[(wheelState.i + 1) % m.path.length];
 
-        bitMeshRef.current!.position.lerpVectors(a, b, wheelState.t);
+        bitMeshRef.current?.position.lerpVectors(a, b, wheelState.t);
       };
       setOtherThingsToRender(other);
       return;
@@ -147,6 +147,15 @@ function App() {
     //   • height = 10mm   (bit.height)
     //     Using 32 radial segments for a reasonably smooth circle.
     const bit = getPass().bit;
+    // MeshBasicMaterial ignores lights → looks flat.
+    // Switch to a PBR‑style material so the cylinder reacts to the Ambient
+    // and Directional lights already in the scene.
+    const bitMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8e98b3,       // same hue
+      metalness: 0.7,        // slight metallic sheen
+      roughness: 0.3,        // enough gloss to catch highlights
+      side: THREE.DoubleSide // keep both faces visible if needed
+    });
     const bitGeometru = new THREE.CylinderGeometry(
       bit.diameter / 2,   // radiusTop
       bit.diameter / 2,   // radiusBottom
@@ -158,10 +167,9 @@ function App() {
     // (Mesh is later placed with position.y = 0 so the wheel rests on the ground plane.)
     bitGeometru.translate(0, -bit.height / 2, 0);  
     bitGeometru.rotateX(-Math.PI / 2); // Rotate so the rectangle lies in the X‑Z plane (normal +Y)
-    const bitMaterial = new THREE.MeshBasicMaterial({ color: 0x8e98b3, side: THREE.DoubleSide });
     const bitMesh = new THREE.Mesh(bitGeometru, bitMaterial);
     bitMeshRef.current = bitMesh;
-    bitMesh.position.set(10, 0, 0)
+    bitMesh.position.set(10, 10, 0)
     toolpathGroupRef.current!.add(bitMesh);
   }
   const loadLines = () => {
@@ -192,7 +200,7 @@ function App() {
   }, [pass]);
   React.useEffect(() => {
     if (!sceneRef.current) return;
-    setPass(2); 
+    setPass(0); 
     loadLines();
   }, [modelBit]);
   React.useEffect(() => {
@@ -220,8 +228,10 @@ function App() {
       0.1,
       1000
     );
-    camera.position.set(0, 0, 500)
+    camera.position.set(30, -30, 100)
     camera.lookAt(0, 0, 0)
+    camera.zoom = 5;                 // higher = closer
+    camera.updateProjectionMatrix(); // must be called after changing zoom
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(mount.clientWidth, mount.clientHeight)
@@ -236,6 +246,7 @@ function App() {
     controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE
     controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN
     controls.mouseButtons.RIGHT = THREE.MOUSE.DOLLY
+    controls.target.x = -5;   // slide view ~20 mm left
     controls.update();
 
     // Add grid helper

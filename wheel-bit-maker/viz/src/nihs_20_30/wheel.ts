@@ -88,7 +88,7 @@ export const getMesh = (segments: ISegments, stepOver: number, bitMesh: THREE.Me
   const markerGeometry = new THREE.SphereGeometry(0.01, 8, 8);
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xff33f9 });
 
-  const path = buildCompleteRasterPath(leftPositions, rightPositions, stepOver, 0.3);
+  const path = buildCompleteRasterPath(leftPositions, rightPositions, stepOver, 0.5);
 
   leftPositions.forEach(pos => {
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
