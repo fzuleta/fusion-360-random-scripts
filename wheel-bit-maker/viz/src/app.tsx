@@ -161,6 +161,7 @@ function App() {
     const bitMaterial = new THREE.MeshBasicMaterial({ color: 0x8e98b3, side: THREE.DoubleSide });
     const bitMesh = new THREE.Mesh(bitGeometru, bitMaterial);
     bitMeshRef.current = bitMesh;
+    bitMesh.position.set(10, 0, 0)
     toolpathGroupRef.current!.add(bitMesh);
   }
   const loadLines = () => {
