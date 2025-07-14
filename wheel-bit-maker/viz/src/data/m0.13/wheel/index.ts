@@ -4,6 +4,7 @@ import { cloneSegment, convertPointToSegment, reverseSegmentList } from "../../.
 export const filename = 'm=0.13 Z=112.stl';
 
 const bottomCut = -0.6
+
 const _points: Segment[] = [
   { // left base
     from: { x: -1,      y: 0, z: bottomCut },
@@ -63,10 +64,16 @@ const _points: Segment[] = [
 });
 
 const left = _points.slice(1, 5).map(it => convertPointToSegment(cloneSegment(it)));
-const pleft0 = cloneSegment(_points[1]);
-pleft0.to = pleft0.from.clone();
-pleft0.from = pleft0.from.clone().sub(new THREE.Vector3(1, 0 ,0))
-left.unshift(convertPointToSegment(pleft0));
+let p0 = cloneSegment(_points[1]);
+p0.to = p0.from.clone();
+p0.from = p0.from.clone().sub(new THREE.Vector3(1, 0 ,0))
+left.unshift(convertPointToSegment(p0));
+// point 2
+// p0 = cloneSegment(left[left.length-1]);
+// delete p0.center;
+// p0.from = p0.to.clone(); 
+// p0.to = p0.to.clone().add(new THREE.Vector3(0.05, 0 ,0))
+// left.push(convertPointToSegment(p0));
 
 // Grab the raw point objects for the right-hand profile
 const rawRight = _points.slice(5, 9).map(cloneSegment); 
@@ -74,10 +81,16 @@ const rawRightReversed = reverseSegmentList(rawRight);
 const right = rawRightReversed.map(convertPointToSegment);
 
 // Add the little vertical “stub” as before (already points the right way)
-const pright0 = cloneSegment(_points[9]);
-pright0.to = pright0.from.clone();
-pright0.from = pright0.from.clone().add(new THREE.Vector3(0.5, 0, 0));
-right.unshift(pright0);
+p0 = cloneSegment(_points[9]);
+p0.to = p0.from.clone();
+p0.from = p0.from.clone().add(new THREE.Vector3(0.5, 0, 0));
+right.unshift(p0);
+// poin 
+p0 = cloneSegment(right[right.length-1]);
+delete p0.center;
+p0.from = p0.to.clone(); 
+p0.to = p0.to.clone().sub(new THREE.Vector3(0.05, 0 ,0))
+right.push(convertPointToSegment(p0));
 
 export const points: ISegments = {
   all: _points.map(it => convertPointToSegment(cloneSegment(it))),
