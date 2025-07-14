@@ -61,7 +61,7 @@ const _points: Segment[] = [
     k.z += offsetZ;
   })
   return convertPointToSegment(it);
-})
+});
 
 const left = _points.slice(1, 5).map(it => convertPointToSegment(cloneSegment(it)));
 const pleft0 = cloneSegment(_points[1]);
@@ -69,10 +69,16 @@ pleft0.to = pleft0.from.clone();
 pleft0.from = pleft0.from.clone().sub(new THREE.Vector3(1, 0 ,0))
 left.unshift(convertPointToSegment(pleft0));
 
+const right = _points.slice(5, 9).map(it => convertPointToSegment(cloneSegment(it)));
+const pright0 = cloneSegment(_points[9]);
+pright0.to = pright0.from.clone();
+pright0.from = pright0.from.clone().add(new THREE.Vector3(0.5, 0 ,0))
+right.unshift(convertPointToSegment(pright0));
+
 export const points: ISegments = {
   all: _points.map(it => convertPointToSegment(cloneSegment(it))),
   left,
-  right: _points.slice(5, 9).map(it => convertPointToSegment(cloneSegment(it))),
+  right,
 }
 
 export const getPasses = (stockRadius: number) => {

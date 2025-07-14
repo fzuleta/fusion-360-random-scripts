@@ -1,6 +1,8 @@
 import * as THREE from 'three';  
 import { degToRad } from '../helpers';
 
+export type TravelDir = 'L2R' | 'R2L';
+
 type Segment = {
   type: string; //'line' | 'arc',
   from: THREE.Vector3,
@@ -83,11 +85,31 @@ export const getMesh = (segments: ISegments, stepOver: number) => {
 
   // create circles 
   const leftPositions: THREE.Vector3[] = []; 
-  const totalLength = segments.left.reduce((sum, seg) => sum + seg.length, 0);
+  const lefttotalLength = segments.left.reduce((sum, seg) => sum + seg.length, 0);
   const state = { d: 0, speed: stepOver }; 
-  while (state.d < totalLength) {
-    const pos = animateLeftPoints({state, millBit: wheel, segments: segments.left});
+  while (state.d < lefttotalLength) {
+    const pos = animateLeftPoints({
+      state,
+      millBit: wheel,
+      segments: segments.left,
+      applyTransform: false,   // don't move the wheel during marker pre‑pass
+    });
     if (pos) leftPositions.push(pos.clone()); // store a copy
+    state.d += state.speed;
+  }
+
+  const rightPositions: THREE.Vector3[] = []; 
+  const righttotalLength = segments.right.reduce((sum, seg) => sum + seg.length, 0);
+  state.d = 0; 
+  while (state.d < righttotalLength) {
+    const pos = animateLeftPoints({
+      state,
+      millBit: wheel,
+      dir: 'R2L',
+      segments: segments.right,
+      applyTransform: false,   // don't move the wheel during marker pre‑pass
+    });
+    if (pos) rightPositions.push(pos.clone()); // store a copy
     state.d += state.speed;
   }
 
@@ -99,7 +121,12 @@ export const getMesh = (segments: ISegments, stepOver: number) => {
     marker.position.set(pos.x, -0.02, pos.z);
     group.add(marker);
   });
-  console.log(JSON.stringify(leftPositions))
+  rightPositions.forEach(pos => {
+    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+    marker.position.set(pos.x, -0.02, pos.z);
+    group.add(marker);
+  });
+  // console.log(JSON.stringify(leftPositions))
   return {group, wheel, segments};
 }
 type WheelAnimationState = {
@@ -121,10 +148,18 @@ export function animateLeftPoints(
     state: WheelAnimationState;           // running distance & step size
     segments: Segment[];                   // line | arc list, left➞right
     millBit: THREE.Mesh;                   // the wheel mesh (1mm × 10mm)
+    dir?: TravelDir;           // 'L2R' (default) or 'R2L'
+    applyTransform?: boolean;  // default=true
   }
 ): THREE.Vector3 | null {
 
-  const { state, segments, millBit } = props;
+  const {
+    state,
+    segments,
+    millBit,
+    dir = 'L2R',
+    applyTransform = true,
+  } = props;
   if (!segments.length) return null;
 
   /* ------------------------------------------------------------------ */
@@ -188,15 +223,16 @@ export function animateLeftPoints(
   /* ------------------------------------------------------------------ */
   const planeParams = (millBit.geometry as THREE.PlaneGeometry).parameters;
   const bitHalfWidth =
-    planeParams ? planeParams.width / 2 : bit.width * 0.5; // Fallback to 0.5 mm if .parameters is missing
+    planeParams ? planeParams.width / 2 : bit.width * 0.5;
 
-  // Because we are travelling left→right, “left” is –X
-  const cx = px - bitHalfWidth;   // tool centre X
-  const cz = pz;                  // keep exact track height (Z in the scene)
+  // Sign is –1 for left‑to‑right (centre shifts left), +1 for right‑to‑left
+  const sign = dir === 'L2R' ? -1 : 1;
+  const cx = px + sign * bitHalfWidth;
+  const cz = pz;
 
   /* ------------------------------------------------------------------ */
   /* 4.  Return THREE.Vector3 in the X‑Z plane (Y=0)                    */
   /* ------------------------------------------------------------------ */
-  millBit.position.set(cx, 0 ,cz)
+  if (applyTransform) millBit.position.set(cx, 0 ,cz)
   return new THREE.Vector3(cx, 0, cz);
 }
