@@ -99,7 +99,6 @@ function App() {
         roughness: 0.8,
       });
       const mesh = new THREE.Mesh(geometry, material);
-
       const box = new THREE.Box3().setFromObject(mesh);
       const size = new THREE.Vector3();
       box.getSize(size);
@@ -134,10 +133,6 @@ function App() {
   } 
   React.useEffect(() => {
     if (!sceneRef.current) return;
-    // if (!lines) {
-      // clearToolPathFromView()
-      // return;
-    // }
     draw();
   }, [lines]);
   React.useEffect(() => { 
