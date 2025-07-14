@@ -88,6 +88,8 @@ export const getMesh = (segments: ISegments, stepOver: number, bitMesh: THREE.Me
   const markerGeometry = new THREE.SphereGeometry(0.01, 8, 8);
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xff33f9 });
 
+  const path = buildCompleteRasterPath(leftPositions, rightPositions, stepOver, 0.3);
+
   leftPositions.forEach(pos => {
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
     marker.position.set(pos.x, -0.02, pos.z);
@@ -99,7 +101,7 @@ export const getMesh = (segments: ISegments, stepOver: number, bitMesh: THREE.Me
     group.add(marker);
   });
   // console.log(JSON.stringify(leftPositions))
-  return {group, bitMesh, segments};
+  return {group, bitMesh, segments, path};
 }
 type WheelAnimationState = {
   d: number;
@@ -130,7 +132,6 @@ export function animateLeftPoints(
     segments,
     bitMesh,
     dir = 'L2R',
-    applyTransform = true,
   } = props;
   if (!segments.length) return null;
 
@@ -209,6 +210,70 @@ export function animateLeftPoints(
   /* ------------------------------------------------------------------ */
   /* 4.  Return THREE.Vector3 in the X‑Z plane (Y=0)                    */
   /* ------------------------------------------------------------------ */
-  if (applyTransform) bitMesh.position.set(cx, 0 ,cz)
   return new THREE.Vector3(cx, 0, cz);
+}
+
+
+/**
+ * Build a "back‑and‑forth" raster path for a single column of cutter
+ * positions.  For every centre point in `posList` it emits four points:
+ *
+ *   [from, to, exitTo, exitFrom]
+ *
+ *   where:
+ *     from     = (x,  y‑offset, z)
+ *     to       = (x, +y‑offset, z)
+ *     exitTo   = to.x  ± stepOver (sign depends on travel dir)
+ *     exitFrom = from.x ± stepOver
+ *
+ * The sign of the step‑over is:
+ *   • dir === 'L2R'  →  negative  (move leftwards)
+ *   • dir === 'R2L'  →  positive  (move rightwards)
+ *
+ * @param posList   Array of centre‑line points (left or right column)
+ * @param stepOver  Amount to offset the exit move in *X*
+ * @param yOffset   Half‑stroke height (distance above/below centre line)
+ * @param dir       Travel direction: 'L2R' (default) or 'R2L'
+ * @returns         Flat array of THREE.Vector3 in the order
+ *                  [from0, to0, exitTo0, exitFrom0, from1, to1, ...]
+ */
+export function buildRasterPath(
+  posList: THREE.Vector3[],
+  stepOver: number,
+  yOffset: number,
+  dir: TravelDir = 'L2R'
+): THREE.Vector3[] {
+
+  const sign = dir === 'L2R' ? -1 : 1;          // −stepOver for L→R, + for R→L
+  const path: THREE.Vector3[] = [];
+
+  for (const p of posList) {
+    const from      = new THREE.Vector3(p.x, p.y - yOffset, p.z);
+    const to        = new THREE.Vector3(p.x, p.y + yOffset, p.z);
+    const exitTo    = new THREE.Vector3(to.x   + sign * stepOver, to.y,   to.z);
+    const exitFrom  = new THREE.Vector3(from.x + sign * stepOver, from.y, from.z);
+
+    path.push(from, to, exitTo, exitFrom);
+  }
+
+  return path;
+}
+
+const buildCompleteRasterPath = ( 
+  leftPositions: THREE.Vector3[],
+  rightPositions: THREE.Vector3[],
+  stepOver: number,
+  yOffset: number,) => {
+
+  const path = buildRasterPath(leftPositions, stepOver, yOffset, 'L2R'); 
+  const safeZ = (z = 1) => new THREE.Vector3(0,0,z);
+
+  path.push(leftPositions[leftPositions.length-1].clone().add(safeZ(1))); 
+  path.push(rightPositions[0].clone().add(safeZ(2)));
+  path.push(...buildRasterPath(rightPositions, stepOver, yOffset, 'R2L'));
+
+  path.push(rightPositions[leftPositions.length-1].clone().add(new THREE.Vector3(0,0,5)));
+  
+  console.log(path)
+  return path;
 }

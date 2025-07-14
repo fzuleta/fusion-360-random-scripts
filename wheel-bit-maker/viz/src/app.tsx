@@ -44,25 +44,26 @@ function App() {
     if (pass === 2) {
       const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
       toolpathGroupRef.current.add(m.group);
-      
-
-      const bitRight = m.bitMesh.clone()
-      m.group.add(bitRight);
-
-      // ── Set‑up per‑frame state so the wheel actually advances ──────────
-      const wheelState = { d: 0, speed: 0.001 };
+      const wheelState = { i: 0, t: 0, speed: 6 };
+      const clock = new THREE.Clock();
 
       const other = otherThingsToRender;
       other['tooth'] = () => {
-        try {
-          // Move the mill‑bit so its right edge follows the left‑hand path
-          tooth.animateLeftPoints({ state: wheelState, segments: m.segments.left, bitMesh: m.bitMesh, });
-          tooth.animateLeftPoints({ state: wheelState, segments: m.segments.right, dir: 'R2L', bitMesh: bitRight, });
-          // Advance along the tool‑path for the next frame
-          wheelState.d += wheelState.speed;
-        } catch (e) {
-          console.error(e);
-        }
+        const dt = clock.getDelta(); 
+        const p0 = m.path[wheelState.i];
+        const p1 = m.path[(wheelState.i + 1) % m.path.length]; 
+        const segLen   = p0.distanceTo(p1);
+        const dFrac    = (wheelState.speed * dt) / segLen;
+        wheelState.t  += dFrac; 
+        if (wheelState.t >= 1) {
+          wheelState.t -= 1;
+          wheelState.i  = (wheelState.i + 1) % m.path.length;
+        } 
+        // Re-fetch segment endpoints if we just advanced i
+        const a = m.path[wheelState.i];
+        const b = m.path[(wheelState.i + 1) % m.path.length];
+
+        bitMeshRef.current!.position.lerpVectors(a, b, wheelState.t);
       };
       setOtherThingsToRender(other);
       return;
