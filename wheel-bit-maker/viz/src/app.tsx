@@ -37,12 +37,29 @@ function App() {
     loadMesh();
     
     // Draw the tooth
-    if (pass===2) {
+    if (pass === 2) {
       const m = tooth.getMesh(modelBit.points, stepOver);
       toolpathGroupRef.current.add(m.group);
+
+      // ── Set‑up per‑frame state so the wheel actually advances ──────────
+      const wheelState = { d: 0, speed: 0.001 };
+
       const other = otherThingsToRender;
-      other['tooth'] = () => {try { tooth.animateWheel({segments: m.segments.left, wheel: m.wheel }); } catch (e) { console.error(e); }}
-      setOtherThingsToRender(other)
+      other['tooth'] = () => {
+        try {
+          // Move the mill‑bit so its right edge follows the left‑hand path
+          tooth.animateLeftPoints({
+            state: wheelState,
+            segments: m.segments.left,
+            millBit: m.wheel,
+          });
+          // Advance along the tool‑path for the next frame
+          wheelState.d += wheelState.speed;
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      setOtherThingsToRender(other);
       return;
     }
 

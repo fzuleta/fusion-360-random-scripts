@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { cloneSegment, convertPointToSegment } from "../../../helpers";
 
 export const filename = 'm=0.13 z=14.stl';
@@ -61,9 +62,16 @@ const _points: Segment[] = [
   })
   return convertPointToSegment(it);
 })
+
+const left = _points.slice(1, 5).map(it => convertPointToSegment(cloneSegment(it)));
+const pleft0 = cloneSegment(_points[1]);
+pleft0.to = pleft0.from.clone();
+pleft0.from = pleft0.from.clone().sub(new THREE.Vector3(1, 0 ,0))
+left.unshift(convertPointToSegment(pleft0));
+
 export const points: ISegments = {
   all: _points.map(it => convertPointToSegment(cloneSegment(it))),
-  left: _points.slice(1, 5).map(it => convertPointToSegment(cloneSegment(it))),
+  left,
   right: _points.slice(5, 9).map(it => convertPointToSegment(cloneSegment(it))),
 }
 

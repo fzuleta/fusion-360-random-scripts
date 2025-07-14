@@ -12,9 +12,7 @@ type Segment = {
 
 const bit = {width: 1, height: 10}
 
-export const getMesh = (
-  segments: ISegments, 
-  stepOver: number) => { 
+export const getMesh = (segments: ISegments, stepOver: number) => { 
   const group = new THREE.Group(); 
   const shape = new THREE.Shape();
   let currentPos: THREE.Vector3 | null = null;
@@ -86,10 +84,9 @@ export const getMesh = (
   // create circles 
   const leftPositions: THREE.Vector3[] = []; 
   const totalLength = segments.left.reduce((sum, seg) => sum + seg.length, 0);
-  const state = { d: 0, speed: stepOver };
-  defaultstate.speed = stepOver / 10;
+  const state = { d: 0, speed: stepOver }; 
   while (state.d < totalLength) {
-    const pos = animateWheel({state, wheel, segments: segments.left});
+    const pos = animateLeftPoints({state, millBit: wheel, segments: segments.left});
     if (pos) leftPositions.push(pos.clone()); // store a copy
     state.d += state.speed;
   }
@@ -99,7 +96,7 @@ export const getMesh = (
 
   leftPositions.forEach(pos => {
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-    marker.position.set(pos.x, 0.02, pos.z);
+    marker.position.set(pos.x, -0.02, pos.z);
     group.add(marker);
   });
   console.log(JSON.stringify(leftPositions))
@@ -108,75 +105,98 @@ export const getMesh = (
 type WheelAnimationState = {
   d: number;
   speed: number;
-  lastSignX?: number;   // remember previous horizontal offset sign (‑1 or +1)
 };
 
-const defaultstate: WheelAnimationState = { d: 0, speed: 0.001 };
-
-export function animateWheel(props: { state?: WheelAnimationState, segments: Segment[], wheel: THREE.Mesh }) {
-  const state = props.state || defaultstate;
-  const { wheel, segments} = props
-  const totalLength = segments.reduce((sum, seg) => sum + seg.length, 0);
-
-  state.d += state.speed;
-  const dWrapped = state.d % totalLength;
-  const bitWidthRadius = bit.width * 0.5;
-  let acc = 0;
-  for (const seg of segments) {
-    if (acc + seg.length >= dWrapped) {
-      const localD = dWrapped - acc;
-      let pos: THREE.Vector3;
-
-      // Re‑use last horizontal side unless we determine a new one
-      let signX = state.lastSignX ?? -1;
-
-      if (seg.type === 'line') {
-        // Tangent direction
-        const dir = seg.to.clone().sub(seg.from).normalize();
-        pos = seg.from.clone().add(dir.multiplyScalar(localD));
-
-        // Outward normal for a left‑hand contour is (‑dir.y, dir.x)
-        const normal = new THREE.Vector2(-dir.z, dir.x).normalize();
-        if (Math.abs(normal.x) > 1e-6) {
-          // Usual case: outward normal has X component → pick that side
-          signX = Math.sign(normal.x);
-        } else if (Math.abs(dir.x) > 1e-6) {
-          // Line is exactly horizontal ⇒ flip side based on travel direction
-          signX = Math.sign(dir.x);
-        }
-      } else if (seg.center) { /* arc */ 
-        // Parametric point on the arc at arc‑length = localD
-        const radius = seg.center.distanceTo(seg.from);
-        const startAngle = Math.atan2(seg.from.z - seg.center.z,
-                                      seg.from.x - seg.center.x);
-        const sweep = localD / radius * (seg.anticlockwise ? 1 : -1);
-        const θ = startAngle + sweep;
-
-        pos = new THREE.Vector3(
-          seg.center.x + radius * Math.cos(θ),
-          0,
-          seg.center.z + radius * Math.sin(θ)
-        );
-
-        const radial = pos.clone().sub(seg.center).normalize();
-        const outward = seg.anticlockwise ? radial.clone().negate() : radial;
-        if (Math.abs(outward.x) > 1e-6) {
-          signX = Math.sign(outward.x);
-        }
-      } else {
-        // Fallback (shouldn’t happen)
-        continue;
-      }
-
-      // Remember chosen side for next segment
-      state.lastSignX = signX;
-
-      // Apply X‑only offset
-      pos.x += signX * bitWidthRadius;
-
-      wheel.position.set(pos.x, 0, pos.z);
-      return pos;
-    }
-    acc += seg.length;
+/**
+ * Returns the centre position for the millBit **on this frame**
+ * so that its right‑hand edge touches the tool‑path point that is
+ * ‘state.d’ millimetres along the supplied segments.
+ *
+ * The caller is responsible for advancing `state.d`
+ * (so remove the old state.d += state.speed line **inside** this
+ * function if you kept it in the caller’s loop).
+ */
+export function animateLeftPoints(
+  props: {
+    state: WheelAnimationState;           // running distance & step size
+    segments: Segment[];                   // line | arc list, left➞right
+    millBit: THREE.Mesh;                   // the wheel mesh (1mm × 10mm)
   }
+): THREE.Vector3 | null {
+
+  const { state, segments, millBit } = props;
+  if (!segments.length) return null;
+
+  /* ------------------------------------------------------------------ */
+  /* 1.  Figure out where along the composite curve we are right now    */
+  /* ------------------------------------------------------------------ */
+  const totalLength = segments.reduce((acc, s) => acc + s.length, 0);
+
+  // Wrap distance so we can cycle for ever
+  const dWrapped = ((state.d % totalLength) + totalLength) % totalLength;
+
+  // Locate the current segment and distance *inside* that segment
+  let seg: Segment | undefined;
+  let distIntoSeg = 0, running = 0;
+
+  for (let i = 0; i < segments.length; i++) {
+    if (running + segments[i].length >= dWrapped) {
+      seg = segments[i];
+      distIntoSeg = dWrapped - running;
+      break;
+    }
+    running += segments[i].length;
+  }
+  if (!seg) seg = segments[segments.length - 1];  // fallback safety
+
+  /* ------------------------------------------------------------------ */
+  /* 2.  Get the XY (actually X‑Z) coordinates ON the tool‑path curve   */
+  /* ------------------------------------------------------------------ */
+  let px = 0, pz = 0;
+
+  if (seg.type === 'line') {
+    const t = distIntoSeg / seg.length;              // 0 → 1
+    px = seg.from.x + t * (seg.to.x - seg.from.x);
+    pz = seg.from.z + t * (seg.to.z - seg.from.z);
+
+  } else if (seg.type === 'arc' && seg.center) {
+    const r = seg.center.distanceTo(seg.from);
+    const a0 = Math.atan2(seg.from.z - seg.center.z, seg.from.x - seg.center.x);
+    const a1 = Math.atan2(seg.to.z   - seg.center.z, seg.to.x   - seg.center.x);
+
+    // Determine signed sweep (positive CCW, negative CW)
+    let sweep = a1 - a0;
+    if (seg.anticlockwise) {
+      if (sweep < 0) sweep += 2 * Math.PI;
+    } else {
+      if (sweep > 0) sweep -= 2 * Math.PI;
+    }
+
+    const t = distIntoSeg / seg.length;              // 0 → 1 along the arc
+    const a = a0 + sweep * t;
+
+    px = seg.center.x + r * Math.cos(a);
+    pz = seg.center.z + r * Math.sin(a);
+
+  } else {
+    return null; // malformed segment – bail
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 3.  Shift tool‑centre left so its RIGHT edge sits on (px,pz)        */
+  /*     We know the bit’s width is 1 mm (see constant in wheel.ts).    */
+  /* ------------------------------------------------------------------ */
+  const planeParams = (millBit.geometry as THREE.PlaneGeometry).parameters;
+  const bitHalfWidth =
+    planeParams ? planeParams.width / 2 : bit.width * 0.5; // Fallback to 0.5 mm if .parameters is missing
+
+  // Because we are travelling left→right, “left” is –X
+  const cx = px - bitHalfWidth;   // tool centre X
+  const cz = pz;                  // keep exact track height (Z in the scene)
+
+  /* ------------------------------------------------------------------ */
+  /* 4.  Return THREE.Vector3 in the X‑Z plane (Y=0)                    */
+  /* ------------------------------------------------------------------ */
+  millBit.position.set(cx, 0 ,cz)
+  return new THREE.Vector3(cx, 0, cz);
 }
