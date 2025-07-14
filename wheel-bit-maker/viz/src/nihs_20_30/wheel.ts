@@ -12,9 +12,8 @@ type Segment = {
   length: number
 };
 
-const bit = {width: 1, height: 10}
 
-export const getMesh = (segments: ISegments, stepOver: number) => { 
+export const getMesh = (segments: ISegments, stepOver: number, bitMesh: THREE.Mesh) => { 
   const group = new THREE.Group(); 
   const shape = new THREE.Shape();
   let currentPos: THREE.Vector3 | null = null;
@@ -54,33 +53,6 @@ export const getMesh = (segments: ISegments, stepOver: number) => {
 
   group.add(mesh);
 
-  // ── Wheel as a thin rectangle (1 mm × 0.01 mm) ─────────────── 
-  const wheelGeometry = new THREE.PlaneGeometry(bit.width, bit.height);
-
-  // Put origin on the *bottom* edge (centre‑bottom in the plane’s local XY)
-  wheelGeometry.translate(0, -bit.height / 2, 0);
-
-  // Rotate so the rectangle lies in the X‑Z plane (normal +Y)
-  wheelGeometry.rotateX(-Math.PI / 2);
-
-  const wheelMaterial = new THREE.MeshBasicMaterial({ color: 0x8e98b3, side: THREE.DoubleSide });
-  const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-
-  // Keep the old radius value for clearance maths (half the width)
-  const wheelRadius = bit.width / 2;
-
-  // Get tangent segment (points[8])
-  const pFrom = new THREE.Vector2(segments.all[8].from.x, segments.all[8].from.z);
-  const pTo = new THREE.Vector2(segments.all[8].to.x, segments.all[8].to.z);
-  const tangent = pTo.clone().sub(pFrom).normalize();
-  const normal = new THREE.Vector2(-tangent.y, tangent.x); // perpendicular
-
-  const contactPoint = pFrom.clone(); // contact at start of segment
-  const center = contactPoint.clone().add(normal.multiplyScalar(wheelRadius));
-
-  wheel.position.set(center.x, 0, center.y); // Flip Y like the shape
-
-  group.add(wheel);
   group.position.set(0, 0, 0.001)
 
   // create circles 
@@ -90,7 +62,7 @@ export const getMesh = (segments: ISegments, stepOver: number) => {
   while (state.d < lefttotalLength) {
     const pos = animateLeftPoints({
       state,
-      millBit: wheel,
+      bitMesh,
       segments: segments.left,
       applyTransform: false,   // don't move the wheel during marker pre‑pass
     });
@@ -104,7 +76,7 @@ export const getMesh = (segments: ISegments, stepOver: number) => {
   while (state.d < righttotalLength) {
     const pos = animateLeftPoints({
       state,
-      millBit: wheel,
+      bitMesh,
       dir: 'R2L',
       segments: segments.right,
       applyTransform: false,   // don't move the wheel during marker pre‑pass
@@ -127,7 +99,7 @@ export const getMesh = (segments: ISegments, stepOver: number) => {
     group.add(marker);
   });
   // console.log(JSON.stringify(leftPositions))
-  return {group, bit: wheel, segments};
+  return {group, bitMesh, segments};
 }
 type WheelAnimationState = {
   d: number;
@@ -147,7 +119,7 @@ export function animateLeftPoints(
   props: {
     state: WheelAnimationState;           // running distance & step size
     segments: Segment[];                   // line | arc list, left➞right
-    millBit: THREE.Mesh;                   // the wheel mesh (1mm × 10mm)
+    bitMesh: THREE.Mesh;                   // the wheel mesh (1mm × 10mm)
     dir?: TravelDir;           // 'L2R' (default) or 'R2L'
     applyTransform?: boolean;  // default=true
   }
@@ -156,7 +128,7 @@ export function animateLeftPoints(
   const {
     state,
     segments,
-    millBit,
+    bitMesh,
     dir = 'L2R',
     applyTransform = true,
   } = props;
@@ -221,10 +193,14 @@ export function animateLeftPoints(
   /* 3.  Shift tool‑centre left so its RIGHT edge sits on (px,pz)        */
   /*     We know the bit’s width is 1 mm (see constant in wheel.ts).    */
   /* ------------------------------------------------------------------ */
-  const planeParams = (millBit.geometry as THREE.PlaneGeometry).parameters;
+  const geomParams = (bitMesh.geometry as any).parameters || {};
   const bitHalfWidth =
-    planeParams ? planeParams.width / 2 : bit.width * 0.5;
-
+    'width' in geomParams
+      ? geomParams.width / 2
+      : 'radiusTop' in geomParams
+        ? geomParams.radiusTop
+        : undefined; // bit.diameter * 0.5;  // ultimate fallback
+  if (bitHalfWidth === undefined) { throw new Error('Whats')}
   // Sign is –1 for left‑to‑right (centre shifts left), +1 for right‑to‑left
   const sign = dir === 'L2R' ? -1 : 1;
   const cx = px + sign * bitHalfWidth;
@@ -233,6 +209,6 @@ export function animateLeftPoints(
   /* ------------------------------------------------------------------ */
   /* 4.  Return THREE.Vector3 in the X‑Z plane (Y=0)                    */
   /* ------------------------------------------------------------------ */
-  if (applyTransform) millBit.position.set(cx, 0 ,cz)
+  if (applyTransform) bitMesh.position.set(cx, 0 ,cz)
   return new THREE.Vector3(cx, 0, cz);
 }

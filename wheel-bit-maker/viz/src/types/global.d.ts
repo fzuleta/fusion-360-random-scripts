@@ -35,3 +35,5 @@ type Segment = {
   length: number
 };
 declare type ITeethPoint =  {from: PointXYZ, to: PointXYZ, center?: PointXYZ & {anticlockwise?: boolean}}
+
+declare type IBit = {diameter: number, height: number }

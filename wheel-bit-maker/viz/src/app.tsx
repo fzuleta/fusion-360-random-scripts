@@ -7,14 +7,15 @@ import { STLLoader } from 'three-stdlib';
 import { models } from './data';
 import * as tooth from './nihs_20_30/wheel';
  
+
 function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
   const [pass, setPass] = React.useState(0);
   const [stepOver, setStepOver] = React.useState(0.04);
   const [stockRadius] = React.useState(6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[1]]);
-  const [bitRadius, setBitRadius] = React.useState(modelBit.getPasses(stockRadius)[0].bitRadius);
   const [lines, setLines] = React.useState<ILinesGotten>();
+  const bitMeshRef = React.useRef<THREE.Mesh>(null);
   const mountRef = React.useRef<HTMLDivElement>(null);
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
   const toolpathGroupRef = React.useRef<THREE.Group | null>(null); 
@@ -34,15 +35,18 @@ function App() {
     toolpathGroupRef.current = new THREE.Group();
     sceneRef.current.add(toolpathGroupRef.current);
 
+    console.log("bitreading")
+    const bit = getPass().bit;
+    console.log("bit", bit)
     loadMesh();
     
     // Draw the tooth
     if (pass === 2) {
-      const m = tooth.getMesh(modelBit.points, stepOver);
+      const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
       toolpathGroupRef.current.add(m.group);
       
 
-      const bitRight = m.bit.clone()
+      const bitRight = m.bitMesh.clone()
       m.group.add(bitRight);
 
       // ── Set‑up per‑frame state so the wheel actually advances ──────────
@@ -52,8 +56,8 @@ function App() {
       other['tooth'] = () => {
         try {
           // Move the mill‑bit so its right edge follows the left‑hand path
-          tooth.animateLeftPoints({ state: wheelState, segments: m.segments.left, millBit: m.bit, });
-          tooth.animateLeftPoints({ state: wheelState, segments: m.segments.right, dir: 'R2L', millBit: bitRight, });
+          tooth.animateLeftPoints({ state: wheelState, segments: m.segments.left, bitMesh: m.bitMesh, });
+          tooth.animateLeftPoints({ state: wheelState, segments: m.segments.right, dir: 'R2L', bitMesh: bitRight, });
           // Advance along the tool‑path for the next frame
           wheelState.d += wheelState.speed;
         } catch (e) {
@@ -92,7 +96,7 @@ function App() {
       points.forEach((p) => {
         if (index <= 1 || index === morphedLines.length - 1) { 
           createLine(p, 0.05, new THREE.Color(0xffffff)); 
-          createLine(p, bitRadius, color)
+          createLine(p, bit.diameter * 0.5, color)
         }
       }); 
     })
@@ -106,10 +110,14 @@ function App() {
     });
 
   }
+  const getPass = () => { 
+    const p = modelBit.getPasses(stockRadius)[pass]; 
+    return p;
+  }
   const loadMesh = () => {  
     // after you create sceneRef.current, camera, renderer, etc.
     const loader = new STLLoader();
-      loader.load(modelBit.filename, geometry => {
+    loader.load(modelBit.filename, geometry => {
       geometry.computeVertexNormals();          // lighting looks nicer
       const material = new THREE.MeshStandardMaterial({
         color: 0xcccccc,
@@ -130,23 +138,41 @@ function App() {
         (box.min.z + box.max.z) / 2             // middle of Z
       );
       mesh.position.sub(centre);                // translate so that point → (0,0,0)
-
-      // ── 3️⃣  Optionally: adjust camera/frustum later to fit the bbox ──────
-      // (camera logic stays where it is; it will already see the object).
-
-      toolpathGroupRef.current!.add(mesh);
+      toolpathGroupRef.current!.add(mesh); 
     });
+
+    // ── Wheel modelled as a thin CYLINDER ────────────────
+    //   • radius = 0.5mm  (bit.diameter / 2)
+    //   • height = 10mm   (bit.height)
+    //     Using 32 radial segments for a reasonably smooth circle.
+    const bit = getPass().bit;
+    const bitGeometru = new THREE.CylinderGeometry(
+      bit.diameter / 2,   // radiusTop
+      bit.diameter / 2,   // radiusBottom
+      bit.height,         // height (along local +Y)
+      32                  // radial segments
+    );
+  
+    // Shift the geometry down so its *bottom* face sits at the local origin.
+    // (Mesh is later placed with position.y = 0 so the wheel rests on the ground plane.)
+    bitGeometru.translate(0, -bit.height / 2, 0);  
+    bitGeometru.rotateX(-Math.PI / 2); // Rotate so the rectangle lies in the X‑Z plane (normal +Y)
+    const bitMaterial = new THREE.MeshBasicMaterial({ color: 0x8e98b3, side: THREE.DoubleSide });
+    const bitMesh = new THREE.Mesh(bitGeometru, bitMaterial);
+    bitMeshRef.current = bitMesh;
+    toolpathGroupRef.current!.add(bitMesh);
   }
   const loadLines = () => {
     const p = modelBit.getPasses(stockRadius)?.[pass];
     console.log(`Changing lines `, p)
-    if (!p) { return setLines(undefined); }
+    if (!p.lineA) { return setLines(undefined); }
     setLines(getLines({stepOver, ...p})); 
   }
   const clearToolPathFromView = () => {
     if (!sceneRef.current) { return; }
     if (!toolpathGroupRef.current) { return; }
     sceneRef.current.remove(toolpathGroupRef.current);
+    bitMeshRef.current = null;
     toolpathGroupRef.current = null;
   } 
   React.useEffect(() => {
@@ -157,16 +183,14 @@ function App() {
     loadLines();
   }, [stepOver]);
   React.useEffect(() => {
-    const p = modelBit.getPasses(stockRadius)[pass];
+    const p = getPass();
     console.log("Changing pass to: ", pass, p)
-    if (!sceneRef.current) return; 
-    p && setBitRadius(p?.bitRadius)
+    if (!sceneRef.current) return;  
     loadLines();
   }, [pass]);
   React.useEffect(() => {
     if (!sceneRef.current) return;
-    setPass(2);
-    setBitRadius(modelBit.getPasses(stockRadius)[0].bitRadius)
+    setPass(2); 
     loadLines();
   }, [modelBit]);
   React.useEffect(() => {

@@ -3,7 +3,13 @@ import * as model_0_13_z14 from './m0.13/pinion';
 
 interface IModel {
   filename: string;
-  getPasses: (stockRadius: number) => { lineStart: PointXYZ[], lineA: PointXYZ[], lineB: PointXYZ[], lineB_offset: PointXYZ[], bitRadius: number }[]
+  getPasses: (stockRadius: number) => { 
+    lineStart: PointXYZ[], 
+    lineA: PointXYZ[], 
+    lineB: PointXYZ[], 
+    lineB_offset: PointXYZ[], 
+    bit: IBit,
+  }[]
   points: ISegments;
 }
 export const models: {[key: string]: IModel} = {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
+import { bit1mm, bit3_175mm, cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
 
 export const filename = 'm=0.13 Z=112.stl';
 
@@ -104,7 +104,7 @@ export const getPasses = (stockRadius: number) => {
   //=====================================================================
   // PASS 0
   //=====================================================================
-  let bitRadius = 3.175 / 2;
+  let bitRadius = bit3_175mm.diameter / 2;
   // console.log('Getting m0.13 Z112')
   const safeX = (bitRadius + (bitRadius*0.1));
   const safeY = (stockRadius + bitRadius + 2);
@@ -136,7 +136,7 @@ export const getPasses = (stockRadius: number) => {
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].y += bitRadius;
-  passes.push({ lineStart, lineA, lineB, lineB_offset, bitRadius });
+  passes.push({ lineStart, lineA, lineB, lineB_offset, bit: bit3_175mm });
   //=====================================================================
   // PASS 1
   //=====================================================================
@@ -160,9 +160,9 @@ export const getPasses = (stockRadius: number) => {
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
-  passes.push({ lineStart, lineA, lineB, bitRadius, lineB_offset });
+  passes.push({ lineStart, lineA, lineB, lineB_offset, bit: bit3_175mm });
   
-  passes.push(undefined); // this is the tooth
+  passes.push({bit: bit3_175mm}); // this is the tooth
   // ------------------- 
   return passes;
 }

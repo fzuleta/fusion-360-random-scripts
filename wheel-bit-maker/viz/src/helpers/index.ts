@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+export const bit1mm: IBit = {diameter: 1, height: 10 }
+export const bit3_175mm: IBit = {diameter: 3.175, height: 10 }
+
 /** Degrees → radians. */
 export const degToRad = (deg: number): number => deg * Math.PI / 180;
 
