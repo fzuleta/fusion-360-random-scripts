@@ -58,13 +58,29 @@ export function buildRasterPath(
     // ── 3) traverse over to the next line's start (still retracted) ─
     if (i + 1 < posList.length) {
       const nextFirst = posList[i + 1][0];
+
+      // traverse over at retract height
       const retractB: TVector3 = new THREE.Vector3(nextFirst.x, retractY, nextFirst.z);
       retractB.isRetract = true;
       path.push(retractB);
-      // The descent back down will happen automatically on the next
-      // iteration when we push `nextFirst` itself.
+
+      // descent back down: mark as cutting move
+      const descent: TVector3 = new THREE.Vector3(nextFirst.x, nextFirst.y, nextFirst.z);
+      descent.isCut = true;
+      path.push(descent);
     }
   }
 
-  return path;
+  // ── 4) strip consecutive duplicates / zero-length hops ──────────────
+  const dedup: TVector3[] = [];
+  for (const p of path) {
+    if (
+      dedup.length === 0 ||
+      !dedup[dedup.length - 1].equals(p)
+    ) {
+      dedup.push(p);
+    }
+  }
+
+  return dedup;
 }

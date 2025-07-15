@@ -56,12 +56,12 @@ function App() {
 
         // ── Skip any zero‑length segments (duplicate points) ────────────
         const n = path.length;
-        while (
-          wheelState.i < n - 1 &&
-          path[wheelState.i].equals(path[(wheelState.i + 1) % n])
-        ) {
-          wheelState.i++;
-        }
+        // while (
+        //   wheelState.i < n - 1 &&
+        //   path[wheelState.i].equals(path[(wheelState.i + 1) % n])
+        // ) {
+          // wheelState.i++;
+        // }
 
         const p0 = path[wheelState.i];
         const p1 = path[(wheelState.i + 1) % n];
@@ -413,6 +413,3 @@ return (
 
 export default App
 
-const convertToVector3 = (lines: PointXYZ[][]) => {
-  return lines.map(line => line.map(pt => new THREE.Vector3(pt.x, pt.y, 0.01)))
-}
