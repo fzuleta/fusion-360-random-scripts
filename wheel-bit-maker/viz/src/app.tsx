@@ -11,12 +11,13 @@ import { isNumeric } from './helpers';
 function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
   const [pass, setPass] = React.useState(0);
-  const [animSpeed, setAnimSpeed] = React.useState(1);
+  // Feed‑rate in mm/min (20 = very slow, 200 = nominal)
+  const [feedRate, setFeedRate] = React.useState(120);
   const [stepOver, setStepOver] = React.useState(0.04);
   const [stockRadius] = React.useState(6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   // const [lines, setLines] = React.useState<ILinesGotten>();
-  const animSpeedRef = React.useRef(1);
+  const feedRateRef = React.useRef(120);
   const bitMeshRef = React.useRef<THREE.Mesh>(null);
   const mountRef = React.useRef<HTMLDivElement>(null);
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
@@ -71,8 +72,8 @@ function App() {
         // just bail for this frame.
         if (segLen === 0) return;
 
-        const speed = p0.isCut ? animSpeedRef.current : 10;
-        const dFrac = (speed * dt) / segLen;
+        const feed = p0.isCut ? (feedRateRef.current / 60) : 10; // convert mm/min → mm/sec
+        const dFrac = (feed * dt) / segLen;
         wheelState.t += dFrac;
 
         // Walk forward through as many nodes as we overshoot
@@ -216,8 +217,8 @@ function App() {
   } 
 
   React.useEffect(() => {
-    animSpeedRef.current = animSpeed;
-  }, [animSpeed]);
+    feedRateRef.current = feedRate;
+  }, [feedRate]);
   React.useEffect(() => {
     console.log("Changing stepOver to: ", stepOver)
     draw();
@@ -372,17 +373,18 @@ return (
           />
         </label>
         <label>
-          Mill Bit Speed:
+          Feed&nbsp;Rate&nbsp;(mm/min):
           <input
             type="number"
-            value={animSpeed}
-            step="1"
-            min="0"
-            style={{width: 50}}
+            value={feedRate}
+            step="10"
+            min="10"
+            max="500"
+            style={{ width: 60 }}
             onChange={(e) => {
               const v = parseFloat(e.target.value);
-              const a = !isNumeric(v) ? animSpeed : v
-              setAnimSpeed(a)
+              if (!isNumeric(v)) return;
+              setFeedRate(v);
             }}
           />
         </label>
@@ -412,4 +414,3 @@ return (
 }
 
 export default App
-
