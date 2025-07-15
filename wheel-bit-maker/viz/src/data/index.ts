@@ -3,12 +3,9 @@ import * as model_0_13_z14 from './m0.13/pinion';
 
 interface IModel {
   filename: string;
-  getPasses: (stockRadius: number) => { 
-    lineStart: PointXYZ[], 
-    lineA: PointXYZ[], 
-    lineB: PointXYZ[], 
-    lineB_offset: PointXYZ[], 
+  getPasses: (stockRadius: number, stepOver: number) => {
     bit: IBit,
+    path: TVector3[];
   }[]
   points: ISegments;
 }

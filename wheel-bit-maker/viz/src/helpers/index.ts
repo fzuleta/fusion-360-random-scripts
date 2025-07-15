@@ -9,6 +9,14 @@ export const degToRad = (deg: number): number => deg * Math.PI / 180;
 /** Radians → degrees. */
 export const radToDeg = (rad: number): number => rad * 180 / Math.PI;
 
+export function isNumeric(str: any) {
+  if (str == null) {
+    return false;
+  }
+  const regx = /^[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?$/;
+  return regx.test(str);
+}
+
 export const cloneSegment = ((p: Segment): Segment => {
   return {
     type: p.type,

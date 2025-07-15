@@ -37,3 +37,5 @@ type Segment = {
 declare type ITeethPoint =  {from: PointXYZ, to: PointXYZ, center?: PointXYZ & {anticlockwise?: boolean}}
 
 declare type IBit = {diameter: number, height: number }
+
+declare type TVector3 = THREE.Vector3 & {isRetract?: boolean; isCut?: boolean }

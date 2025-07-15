@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { bit1mm, bit3_175mm, cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
+import { generatePath } from '../../helpers';
 
 export const filename = 'm=0.13 z=14.stl';
  
@@ -98,10 +99,10 @@ export const points: ISegments = {
   right,
 }
 
-export const getPasses = (stockRadius: number) => {
+export const getPasses = (stockRadius: number, stepOver: number) => {
   const passes: any = [];
-  let bitRadius = bit3_175mm.diameter / 2;
-  // console.log('Getting m0.13 z14')
+  let bit = bit3_175mm;
+  let bitRadius = bit.diameter * 0.5;
   const safeX = (bitRadius + (bitRadius*0.1));
   const safeY = (stockRadius + bitRadius + 2);
   const z = 0;
@@ -128,17 +129,18 @@ export const getPasses = (stockRadius: number) => {
 
   lineA.forEach(it => it.y += bitRadius);
   let lineB_offset = JSON.parse(JSON.stringify(lineB))
-  let i = 0;
+  let i: number;
   i=0;  lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].y += bitRadius;
-  passes.push({ lineStart, lineA, lineB, lineB_offset, bit: bit3_175mm });
+  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, bit, stepOver}) });
   //=====================================================================
   // PASS 1
   //=====================================================================
-  bitRadius = 0.381 / 2//1 / 2;
+  bit = bit1mm;
+  bitRadius = bit.diameter * 0.5
   lineA = [ // the border of the stock
     { x: 0, y: 1.5, z }, 
     { x: -5.0, y: 1.5, z }
@@ -153,14 +155,14 @@ export const getPasses = (stockRadius: number) => {
   lineA.forEach(it => it.y += bitRadius);
   lineB_offset = JSON.parse(JSON.stringify(lineB));
 
-  i = 0;
   i=0;  lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
-  i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
-  passes.push({ lineStart, lineA, lineB, lineB_offset, bit: bit3_175mm });
+  i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
+  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, bit, stepOver}) });
   
-  passes.push({bit: bit3_175mm}); // this is the tooth
+  // Pass 3 - tooth
+  passes.push({bit: bit3_175mm, path: []}); // this is the tooth
   
   return passes;
 }

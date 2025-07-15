@@ -2,31 +2,32 @@ import * as THREE from 'three'
 import * as React from 'react'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import styles from './app.module.scss'
-import { getLines, type ILinesGotten } from './toolpath'
 import { STLLoader } from 'three-stdlib';
 import { models } from './data';
 import * as tooth from './nihs_20_30/wheel';
+import { isNumeric } from './helpers';
  
 
 function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
   const [pass, setPass] = React.useState(0);
+  const [animSpeed, setAnimSpeed] = React.useState(1);
   const [stepOver, setStepOver] = React.useState(0.04);
   const [stockRadius] = React.useState(6 / 2);
-  const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[1]]);
-  const [lines, setLines] = React.useState<ILinesGotten>();
+  const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
+  // const [lines, setLines] = React.useState<ILinesGotten>();
+  const animSpeedRef = React.useRef(1);
   const bitMeshRef = React.useRef<THREE.Mesh>(null);
   const mountRef = React.useRef<HTMLDivElement>(null);
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
   const toolpathGroupRef = React.useRef<THREE.Group | null>(null); 
 
-  const createLine = (p: THREE.Vector3, radius: number, color: THREE.Color) => {
-    const ringGeom = new THREE.RingGeometry(radius - 0.01, radius, 512);
-    const ringMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.1 });
-    const ring = new THREE.Line(ringGeom, ringMat);
-    ring.position.set(p.x, p.y, 0.02); // offset slightly in Z to avoid z-fighting
-    toolpathGroupRef.current!.add(ring);
-  }
+  const [scrub, setScrub] = React.useState(0);            // 0‑100 %
+  const isScrubbingRef = React.useRef(false);
+  const pathRef = React.useRef<TVector3[]>([]);
+  // Shared progress for animBit <–> scrub slider
+  const wheelStateRef = React.useRef<{ i: number; t: number }>({ i: 0, t: 0 });
+
   const draw = () => {
     if (!sceneRef.current) return; 
     if (toolpathGroupRef.current) {
@@ -35,84 +36,118 @@ function App() {
     toolpathGroupRef.current = new THREE.Group();
     sceneRef.current.add(toolpathGroupRef.current);
 
-    console.log("bitreading")
-    const bit = getPass().bit;
-    console.log("bit", bit)
+    const p = getPass();
+    if (!p) { return; }
+
     loadMesh();
-    
-    // Draw the tooth
-    if (pass === 2) {
-      const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
-      toolpathGroupRef.current.add(m.group);
-      const wheelState = { i: 0, t: 0, speed: 1 };
+
+    const animBit = (path: TVector3[]) => {
+      // reset & alias shared state for this new path
+      wheelStateRef.current.i = 0;
+      wheelStateRef.current.t = 0;
+      const wheelState = wheelStateRef.current;
       const clock = new THREE.Clock();
 
       const other = otherThingsToRender;
       other['tooth'] = () => {
-        const dt = clock.getDelta(); 
-        const p0 = m.path[wheelState.i];
-        const p1 = m.path[(wheelState.i + 1) % m.path.length]; 
-        const segLen   = p0.distanceTo(p1);
-        const dFrac    = (wheelState.speed * dt) / segLen;
-        wheelState.t  += dFrac; 
-        if (wheelState.t >= 1) {
+        if (isScrubbingRef.current) return;   // freeze while slider is held
+        // elapsed time
+        const dt = clock.getDelta();
+
+        // ── Skip any zero‑length segments (duplicate points) ────────────
+        const n = path.length;
+        while (
+          wheelState.i < n - 1 &&
+          path[wheelState.i].equals(path[(wheelState.i + 1) % n])
+        ) {
+          wheelState.i++;
+        }
+
+        const p0 = path[wheelState.i];
+        const p1 = path[(wheelState.i + 1) % n];
+        const segLen = p0.distanceTo(p1);
+
+        // If after skipping dupes we still have a zero‑length segment,
+        // just bail for this frame.
+        if (segLen === 0) return;
+
+        const speed = p0.isCut ? animSpeedRef.current : 10;
+        const dFrac = (speed * dt) / segLen;
+        wheelState.t += dFrac;
+
+        // Walk forward through as many nodes as we overshoot
+        while (wheelState.t >= 1) {
           wheelState.t -= 1;
-          wheelState.i  = (wheelState.i + 1) % m.path.length;
-        } 
-        // Re-fetch segment endpoints if we just advanced i
-        const a = m.path[wheelState.i];
-        const b = m.path[(wheelState.i + 1) % m.path.length];
+          wheelState.i = (wheelState.i + 1) % n;
+
+          // Skip any further zero‑length segments
+          while (
+            wheelState.i < n - 1 &&
+            path[wheelState.i].equals(path[(wheelState.i + 1) % n])
+          ) {
+            wheelState.i++;
+          }
+        }
+
+        // Re-fetch endpoints after potential advance
+        const a = path[wheelState.i];
+        const b = path[(wheelState.i + 1) % n];
 
         bitMeshRef.current?.position.lerpVectors(a, b, wheelState.t);
+        // ── Reflect playback on the slider (if not actively scrubbing) ──
+        if (!isScrubbingRef.current && n > 1) {
+          const progress = ((wheelState.i + wheelState.t) / (n - 1)) * 100;
+          setScrub(progress);
+        }
       };
       setOtherThingsToRender(other);
+    }
+    
+
+    if (pass <= 1 ) {
+      const path: TVector3[] = p.path;
+      pathRef.current = path;            // ← expose to slider
+      // build geometry
+      const geo = new THREE.BufferGeometry().setFromPoints(path);
+
+      // ── create a red → yellow gradient ───────────────────────────────
+      const cStart = new THREE.Color(0xff0000);   // red
+      const cEnd   = new THREE.Color(0xffff00);   // yellow
+      const colours: number[] = [];
+
+      const last = path.length - 1;
+      path.forEach((p: TVector3, i) => {
+        if (!p.isCut) { return colours.push(255,255,255)}
+        const t = last === 0 ? 0 : i / last;      // 0 → 1 along the line
+        const col = cStart.clone().lerp(cEnd, t); // interpolate
+        colours.push(col.r, col.g, col.b);        // push r-g-b
+      });
+
+      // attach the colour buffer (3 floats per vertex)
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+
+      // material that respects vertex colours
+      const mat  = new THREE.LineBasicMaterial({ vertexColors: true });
+      const line = new THREE.Line(geo, mat);
+      toolpathGroupRef.current.add(line);
+      // console.log(JSON.stringify(path)) 
+      // const geo  = new THREE.BufferGeometry().setFromPoints(path);
+      // const mat  = new THREE.LineBasicMaterial({ color: 0xffffff });
+      // const line = new THREE.Line(geo, mat);
+      toolpathGroupRef.current.add(line); 
+      animBit(path);
       return;
     }
-
-    if (!lines) { return; }
-    // clear the animation
-    const other = otherThingsToRender;
-    delete other['tooth'];
-    setOtherThingsToRender(other);
-
-  
-
-    // draw morphed lines
-    const morphedLines = convertToVector3(lines.morphedLines);
-
-    // Render morphedLines with progressively lighter color
-    morphedLines.forEach((points, index) => {
-      const t = index / (morphedLines.length-1)
-      const color = new THREE.Color().lerpColors(
-        new THREE.Color(0xffff00),
-        new THREE.Color(0xff7200),
-        t
-      )
-      const material = new THREE.LineBasicMaterial({ color }) 
-      const geometry = new THREE.BufferGeometry().setFromPoints(points)
-      const lineMesh = new THREE.Line(geometry, material)
-      toolpathGroupRef.current!.add(lineMesh);
-      // Draw a translucent circle at each point
-
-      points.forEach((p) => {
-        if (index <= 1 || index === morphedLines.length - 1) { 
-          createLine(p, 0.05, new THREE.Color(0xffffff)); 
-          createLine(p, bit.diameter * 0.5, color)
-        }
-      }); 
-    })
-
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff });
-    lines.originalLines.forEach((line) => {
-      const points = line.map(p => new THREE.Vector3(p.x, p.y, 0.03));
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const lineMesh = new THREE.Line(geometry, material);
-      toolpathGroupRef.current!.add(lineMesh); 
-    });
-
+    if (pass === 2) {
+      const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
+      pathRef.current = m.path;          // ← expose to slider
+      toolpathGroupRef.current.add(m.group);
+      animBit(m.path);
+      return;
+    }
   }
-  const getPass = () => { 
-    const p = modelBit.getPasses(stockRadius)[pass]; 
+  const getPass = () => {
+    const p = modelBit.getPasses(stockRadius, stepOver)[pass]; 
     return p;
   }
   const loadMesh = () => {  
@@ -172,12 +207,6 @@ function App() {
     bitMesh.position.set(10, 10, 0)
     toolpathGroupRef.current!.add(bitMesh);
   }
-  const loadLines = () => {
-    const p = modelBit.getPasses(stockRadius)?.[pass];
-    console.log(`Changing lines `, p)
-    if (!p.lineA) { return setLines(undefined); }
-    setLines(getLines({stepOver, ...p})); 
-  }
   const clearToolPathFromView = () => {
     if (!sceneRef.current) { return; }
     if (!toolpathGroupRef.current) { return; }
@@ -185,24 +214,25 @@ function App() {
     bitMeshRef.current = null;
     toolpathGroupRef.current = null;
   } 
+
   React.useEffect(() => {
-    if (!sceneRef.current) return;
+    animSpeedRef.current = animSpeed;
+  }, [animSpeed]);
+  React.useEffect(() => {
+    console.log("Changing stepOver to: ", stepOver)
     draw();
-  }, [lines]);
-  React.useEffect(() => { 
-    loadLines();
   }, [stepOver]);
   React.useEffect(() => {
     const p = getPass();
     console.log("Changing pass to: ", pass, p)
-    if (!sceneRef.current) return;  
-    loadLines();
+    if (!sceneRef.current) return;
+    draw();
   }, [pass]);
   React.useEffect(() => {
     if (!sceneRef.current) return;
-    setPass(0); 
-    loadLines();
-  }, [modelBit]);
+    setPass(0);
+    draw();
+  }, [modelBit]); 
   React.useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -268,67 +298,113 @@ function App() {
     }
     animate()
 
-
-    loadLines();
+    draw();
     return () => {
       mount.removeChild(renderer.domElement)
     }
   }, []);
+
+  React.useEffect(() => {
+    if (!bitMeshRef.current || pathRef.current.length < 2) return;
+
+    const path = pathRef.current;
+    const u = scrub / 100;                       // 0 → 1
+    const last = path.length - 1;
+    const idx = Math.floor(u * last);
+    const t   = (u * last) - idx;
+
+    const a = path[idx];
+    const b = path[Math.min(idx + 1, last)];
+
+    const pos = new THREE.Vector3().lerpVectors(a, b, t);
+    bitMeshRef.current.position.copy(pos);
+    // sync animBit to the slider
+    wheelStateRef.current.i = idx;
+    wheelStateRef.current.t = t;
+  }, [scrub]);
+
 return (
   <div className={styles.container}>
     <div className={styles.header}>
-      <label>
-        Model:
-        <select
-          value={Object.keys(models).find((key) => models[key] === modelBit)}
-          onChange={(e) => {
-            clearToolPathFromView(); 
-            setModelBit(models[e.target.value]);
-          }}
-        >
-          {Object.keys(models).map((key) => (
-            <option key={key} value={key}>{key}</option>
-          ))}
-        </select>
-      </label>
+      <div className={styles.row}>
+        <label>
+          Model:
+          <select
+            value={Object.keys(models).find((key) => models[key] === modelBit)}
+            onChange={(e) => {
+              clearToolPathFromView(); 
+              setModelBit(models[e.target.value]);
+            }}
+          >
+            {Object.keys(models).map((key) => (
+              <option key={key} value={key}>{key}</option>
+            ))}
+          </select>
+        </label>
 
-      <label>
-        Pass:
-        <select
-          value={pass}
-          onChange={(e) => setPass(parseInt(e.target.value))}
-        >
-          {modelBit.getPasses(stockRadius).map((_, index) => (
-            <option key={index} value={index}>Pass {index + 1}</option>
-          ))}
-        </select>
-      </label>
+        <label>
+          Pass:
+          <select
+            value={pass}
+            onChange={(e) => setPass(parseInt(e.target.value))}
+          >
+            {modelBit.getPasses(stockRadius, stepOver).map((_, index) => (
+              <option key={index} value={index}>Pass {index + 1}</option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Step Over:
+          <input
+            type="number"
+            value={stepOver}
+            step="0.01"
+            min="0"
+            style={{width: 50}}
+            onChange={(e) => {
+              let v = parseFloat(e.target.value);
+              if (isNumeric(v) && v < 0.01) { v = 0.01; }
+              if (isNumeric(v) && v > 1) { v = 1; }
+              const a = !isNumeric(v) ? stepOver : v
+              setStepOver(a)
+            }}
+          />
+        </label>
+        <label>
+          Mill Bit Speed:
+          <input
+            type="number"
+            value={animSpeed}
+            step="1"
+            min="0"
+            style={{width: 50}}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              const a = !isNumeric(v) ? animSpeed : v
+              setAnimSpeed(a)
+            }}
+          />
+        </label>
+      </div>
+      {/* full‑width scrub slider on its own line */}
+      <div style={{ width: '100%', marginTop: 4 }}>
+        <label style={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+          Preview&nbsp;%&nbsp;
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={0.1}
+            value={scrub}
+            onMouseDown={() => (isScrubbingRef.current = true)}
+            onMouseUp={()   => (isScrubbingRef.current = false)}
+            onChange={(e) => setScrub(parseFloat(e.target.value))}
+            style={{ flexGrow: 1 }}
+          />
+        </label>
+      </div>
       
-      <label>
-        Step Over:
-        <input
-          type="number"
-          value={stepOver}
-          step="0.01"
-          min="0"
-          onChange={(e) => setStepOver(parseFloat(e.target.value))}
-        />
-      </label>
-      {/* <label>
-        Stock Radius:
-        <input
-          type="number"
-          value={stockRadius}
-          step="0.01"
-          min="0"
-          onChange={(e) => setStockRadius(parseFloat(e.target.value))}
-        />
-      </label> */}
-      {/* <button onClick={() => clearToolPathFromView()}>Clear stage</button> */}
-      {/* <button onClick={() => {
-        clearToolPathFromView(); 
-        requestAnimationFrame(() => loadLines())
-      }}>Generate Toolpath</button> */}
     </div>
     <div ref={mountRef} className={styles.canvas} />
   </div>
