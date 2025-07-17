@@ -1,18 +1,18 @@
 import * as THREE from 'three';
-import { morphLines } from '../../toolpath/morph-lines';
 
-export const generatePath = (props: { 
-  bit: IBit; 
+import { morphLinesAdaptive } from '../../toolpath/morph-lines';
+
+export const generatePath = (props: {  
   stepOver: number, 
   lineStart: PointXYZ[], 
   lineA: PointXYZ[], 
   lineB: PointXYZ[],
   lineB_offset: PointXYZ[];
 }) => {
-  const {bit, stepOver, lineA, lineB_offset} = props;
+  const {stepOver, lineA, lineB_offset} = props;
   const originalLines: PointXYZ[][] = [props.lineStart, props.lineA, props.lineB];
   const lineStart = convertLinesToVector3s(props.lineStart,);
-  const morphedLines = morphLines({ lineA, lineB: lineB_offset, stepOver, bitRadius: bit.diameter * 0.5 });
+  const morphedLines = morphLinesAdaptive({ lineA, lineB: lineB_offset, stepOver, maxSeg: stepOver });
   
   const path=buildRasterPath(morphedLines, 0.1);
   path.unshift(...lineStart);
@@ -49,7 +49,7 @@ export function buildRasterPath(
     }
 
     // ── 2) retract up after the last point ──────────────────────────
-    const last = line[line.length - 1];
+    const last = line[0];
     const retractY = last.y + yOffset;
     const retractA: TVector3 = new THREE.Vector3(last.x, retractY, last.z);
     retractA.isRetract = true;

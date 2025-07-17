@@ -6,6 +6,11 @@ import { STLLoader } from 'three-stdlib';
 import { models } from './data';
 import * as tooth from './nihs_20_30/wheel';
 import { isNumeric } from './helpers';
+import {
+  planSegmentsFromPasses,
+  generateGCodeFromSegments, 
+} from './toolpath/morph-lines';
+import { fitArcsInSegments } from './toolpath/fir-arcs';
  
 
 function App() {
@@ -324,6 +329,43 @@ function App() {
     wheelStateRef.current.t = t;
   }, [scrub]);
 
+
+  /** Download the current pass as G‑code (.nc) */
+  const handleDownloadGcode = () => {
+    const current = getPass();
+    if (!current) return;
+
+    // We rely on `morphedLines` if provided by the pass generator,
+    // else fall back to deriving passes from the displayed path.
+    const passes = (current as any).morphedLines;
+
+    // Fallback safe values if the bit description is missing
+    const bit = (current as any).bit ?? { diameter: 0.4, height: 5 };
+
+    const segmentsRaw = planSegmentsFromPasses({
+      passes,
+      safeY: stockRadius + bit.diameter / 2 + 2, // 2 mm clearance
+      cutZ:  -0.5,                               // demo depth
+      stepOver,
+      baseFeed: feedRate,
+      plungeFeed: feedRate * 0.4,
+    });
+    const segmentsFitted = fitArcsInSegments(segmentsRaw, { tol: 0.002, arcFrac: 0.8 });
+    const gcodeLines = generateGCodeFromSegments({
+      segments: segmentsFitted,
+      rotationSteps: 0,
+      indexAfterPath: 1,
+    });
+
+    const blob = new Blob([gcodeLines.join('\n')], { type: 'text/plain' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'pass.nc';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
 return (
   <div className={styles.container}>
     <div className={styles.header}>
@@ -388,6 +430,9 @@ return (
             }}
           />
         </label>
+        <button style={{ marginLeft: 8 }} onClick={handleDownloadGcode}>
+          ⬇︎&nbsp;Download&nbsp;G‑code
+        </button>
       </div>
       {/* full‑width scrub slider on its own line */}
       <div style={{ width: '100%', marginTop: 4 }}>
