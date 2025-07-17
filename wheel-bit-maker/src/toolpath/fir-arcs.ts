@@ -34,10 +34,20 @@ export function fitArcsInSegments(
         if (!fit) break;
         const { x: Xc, y: Yc, r: R } = fit;
 
-        // max orthogonal residual
-        const err = slice.reduce((m, p) => Math.max(m, Math.abs(Math.hypot(p.x - Xc, p.y - Yc) - R)), 0);
-
-        if (err > tol) break;                // too far – stop growing
+        // max orthogonal residual 
+        const errXY = slice.reduce((m, p) =>
+          Math.max(m, Math.abs(Math.hypot(p.x - Xc, p.y - Yc) - R)), 0);
+        
+        // Also check Z linearity for helix
+        const z0 = slice[0].z, zN = slice[slice.length - 1].z;
+        const dz = zN - z0;
+        const errZ = slice.reduce((m, p, k) => {
+          const t = k / (slice.length - 1);
+          return Math.max(m, Math.abs((z0 + dz * t) - p.z));
+        }, 0);
+        
+        if (errXY > tol || errZ > tol) break; 
+        
         cx = Xc; cy = Yc; r = R; ok = true;
         j++;
       }

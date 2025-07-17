@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 
-import { generateGCodeFromSegments, morphLinesAdaptive, planSegmentsFromPasses } from '../../toolpath/morph-lines';
+import { morphLinesAdaptive, planSegmentsFromPasses, type ToolpathSegment } from '../../toolpath/morph-lines';
 import { fitArcsInSegments } from '../../toolpath/fir-arcs';
+
 
 export const generatePath = (props: {  
   stepOver: number, 
@@ -15,26 +16,23 @@ export const generatePath = (props: {
 }) => {
   const { stepOver, lineA, lineB_offset, stockRadius, bit, feedRate } = props;
   const originalLines: PointXYZ[][] = [props.lineStart, props.lineA, props.lineB];
-  const lineStart = convertLinesToVector3s(props.lineStart,);
   const morphedLines = morphLinesAdaptive({ lineA, lineB: lineB_offset, stepOver, maxSeg: stepOver });
   
-  const path=buildRasterPath(morphedLines, 0.1);
-  path.unshift(...lineStart);
-  
   const segmentsRaw = planSegmentsFromPasses({
-    passes: path,
+    passes: morphedLines,
     safeY: stockRadius + bit.diameter / 2 + 2, // 2 mm clearance
     cutZ:  -0.5,                               // demo depth
     stepOver,
     baseFeed: feedRate,
     plungeFeed: feedRate * 0.4,
   });
-  const segmentsFitted = fitArcsInSegments(segmentsRaw, { tol: 0.002, arcFrac: 0.8 }); 
+  const segmentsForGcodeFitted = fitArcsInSegments(segmentsRaw, { tol: 0.002, arcFrac: 0.8 }); 
+  
   return {
     originalLines,
     morphedLines,
-    path,
-    segmentsFitted,
+    segmentsForThreeJs: segmentsToVectorPath(segmentsForGcodeFitted), // for THREE to draw
+    segmentsForGcodeFitted, // for GCODE to export
   }
 }
 export const convertLinesToVector3s = (line: PointXYZ[]) => {
@@ -97,4 +95,56 @@ export function buildRasterPath(
   }
 
   return dedup;
+}
+
+
+export function segmentsToVectorPath(
+  segs: ToolpathSegment[],
+  arcRes = 0.2         // mm chord height for arc tessellation
+): TVector3[] {
+  const out: TVector3[] = [];
+
+  const push = (v: THREE.Vector3, kind: 'cut'|'retract'|'rapid') => {
+    (v as TVector3).isCut      = kind === 'cut';
+    (v as TVector3).isRetract  = kind === 'retract';
+    (v as TVector3).isRapid    = kind === 'rapid';
+    out.push(v as TVector3);
+  };
+
+  for (const s of segs) {
+    switch (s.kind) {
+      case 'rapid':
+      case 'plunge':
+      case 'retract':
+      case 'cut':
+        s.pts.forEach(p =>
+          push(new THREE.Vector3(p.x, p.y, p.z), 
+               s.kind === 'cut' ? 'cut' : 'retract')
+        );
+        break;
+
+      case 'arc': {
+        const [a,b] = s.pts;
+        const { cx, cy, r, cw } = s.arc!;
+        const a0   = Math.atan2(a.y - cy, a.x - cx);
+        const a1   = Math.atan2(b.y - cy, b.x - cx);
+        const span = cw
+          ? (a0 > a1 ? a0 - a1 : a0 - a1 + 2*Math.PI)
+          : (a1 > a0 ? a1 - a0 : a1 - a0 + 2*Math.PI);
+        const steps = Math.max(2, Math.ceil(r * span / arcRes));
+
+        for (let i = 0; i <= steps; i++) {
+          const t = cw ? -i/steps : i/steps;
+          const ang = a0 + span * t;
+          push(
+            new THREE.Vector3(cx + r*Math.cos(ang), cy + r*Math.sin(ang), a.z),
+            'cut'
+          );
+        }
+        break;
+      }
+    }
+  }
+  // remove duplicates
+  return out.filter((p,i,arr)=> i===0 || !p.equals(arr[i-1]));
 }

@@ -84,7 +84,7 @@ export function morphLinesAdaptive({
       const mid = P.map((p, i) => ({
         x: p.x + (Q[i].x - p.x) * t,
         y: p.y + (Q[i].y - p.y) * t,
-        z: 0,
+        z: p.z + (Q[i].z - p.z) * t,
       }));
       passes.splice(idx + j, 0, mid);
     }
@@ -102,7 +102,7 @@ export function morphLinesAdaptive({
 export function planSegmentsFromPasses(props: {
   passes: PointXYZ[][];
   safeY: number;        // clearance plane in Y
-  cutZ: number;         // machining depth
+  cutZ?: number;         // machining depth
   stepOver: number;     // radial engagement used when the pass set was built
   baseFeed: number;     // feed‑rate for a full‑width cut
   plungeFeed?: number;  // optional slower plunge / retract feed
@@ -121,13 +121,21 @@ export function planSegmentsFromPasses(props: {
     segments.push({ kind: 'rapid', pts: [{ x: first.x, y: safeY, z: first.z }] });
 
     // 2) plunge down to cutting depth
-    segments.push({ kind: 'plunge', pts: [{ x: first.x, y: first.y, z: cutZ }], feed: plungeFeed });
+    segments.push({
+      kind: 'plunge',
+      pts: [{ x: first.x, y: first.y, z: cutZ === undefined ? first.z : cutZ }],
+      feed: plungeFeed,
+    });
 
     // 3) cutting move along the pass
-    segments.push({ kind: 'cut',
-                    pts: line.map(p => ({ ...p, z: cutZ })),
-                    feed: feedFor(stepOver) });
-
+    segments.push({
+      kind: 'cut',
+      pts: cutZ === undefined
+        ? line                              // keep incoming z
+        : line.map(p => ({ ...p, z: cutZ })), // flatten if caller insists
+      feed: feedFor(stepOver),
+    });
+    
     // 4) retract back up in Y
     segments.push({ kind: 'retract', pts: [{ x: last.x, y: safeY, z: last.z }], feed: plungeFeed });
   }
@@ -152,7 +160,8 @@ export function resampleLine(line: PointXYZ[], referenceLine?: PointXYZ[]): Poin
 
       const t = (ref.x - p0.x) / (p1.x - p0.x || 1);
       const y = p0.y + (p1.y - p0.y) * t;
-      result.push({ x: ref.x, y, z: 0 });
+      const z = (p0.z ?? 0) + ((p1.z ?? 0) - (p0.z ?? 0)) * t;
+      result.push({ x: ref.x, y, z });
     }
 
     return result;
@@ -191,11 +200,12 @@ export function resampleLine(line: PointXYZ[], referenceLine?: PointXYZ[]): Poin
     const segLen = segmentLengths[segIndex];
     const segOffset = currentDist - cumulative[segIndex];
     const t = segLen === 0 ? 0 : segOffset / segLen;
+    const z = (segStart.z ?? 0) + ((segEnd.z ?? 0) - (segStart.z ?? 0)) * t;
 
     result.push({
       x: segStart.x + (segEnd.x - segStart.x) * t,
       y: segStart.y + (segEnd.y - segStart.y) * t,
-      z: 0,
+      z,
     });
 
     currentDist += step;
@@ -224,7 +234,8 @@ const densifyLine = (line: PointXYZ[], maxSeg: number): PointXYZ[] => {
 
     const dx = p1.x - p0.x;
     const dy = p1.y - p0.y;
-    const dist = Math.hypot(dx, dy);
+    const dz = (p1.z ?? 0) - (p0.z ?? 0);
+    const dist = Math.hypot(dx, dy, dz);
     const segments = Math.max(1, Math.ceil(dist / maxSeg));
 
     for (let s = 0; s < segments; s++) {
@@ -232,7 +243,7 @@ const densifyLine = (line: PointXYZ[], maxSeg: number): PointXYZ[] => {
       dense.push({
         x: p0.x + dx * t,
         y: p0.y + dy * t,
-        z: 0,
+        z: p0.z + dz * t,
       });
     }
   }

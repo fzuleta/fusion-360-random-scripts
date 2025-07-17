@@ -3,11 +3,10 @@ import * as model_0_13_z14 from './m0.13/pinion';
 import type { ToolpathSegment } from '../toolpath/morph-lines';
 
 export type IPass = {
-  bit: IBit,
-  path: TVector3[];
-  originalLines: PointXYZ[][],
-  morphedLines: PointXYZ[][],
-  segmentsFitted: ToolpathSegment[];
+  bit: IBit, 
+  originalLines: PointXYZ[][], 
+  segmentsForThreeJs: TVector3[][],
+  segmentsForGcodeFitted  : ToolpathSegment[];
 }
 
 interface IModel {

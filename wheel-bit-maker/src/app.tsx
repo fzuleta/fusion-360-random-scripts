@@ -111,7 +111,7 @@ function App() {
     
 
     if (passNum <= 1 ) {
-      const path: TVector3[] = pass.path;
+      const path: TVector3[] = pass.segmentsForThreeJs;
       pathRef.current = path;            // ← expose to slider
       // build geometry
       const geo = new THREE.BufferGeometry().setFromPoints(path);
@@ -123,10 +123,13 @@ function App() {
 
       const last = path.length - 1;
       path.forEach((p: TVector3, i) => {
-        if (!p.isCut) { return colours.push(255,255,255)}
-        const t = last === 0 ? 0 : i / last;      // 0 → 1 along the line
-        const col = cStart.clone().lerp(cEnd, t); // interpolate
-        colours.push(col.r, col.g, col.b);        // push r-g-b
+        if (p.isRapid)  { colours.push(0,1,1); }    // cyan
+        else if (p.isRetract) { colours.push(1,0,1);} // magenta
+        else {
+          const t = last === 0 ? 0 : i / last;      // 0 → 1 along the line
+          const col = cStart.clone().lerp(cEnd, t); // interpolate
+          colours.push(col.r, col.g, col.b);        // push r-g-b
+        }
       });
 
       // attach the colour buffer (3 floats per vertex)
@@ -336,7 +339,7 @@ function App() {
     if (!current) return;
 
     const gcodeLines = generateGCodeFromSegments({
-      segments: current.segmentsFitted,
+      segments: current.segmentsForGcodeFitted,
       rotationSteps: 0,
       indexAfterPath: 1,
     });
@@ -375,7 +378,7 @@ return (
             value={passNum}
             onChange={(e) => setPassNum(parseInt(e.target.value))}
           >
-            {modelBit.getPasses(stockRadius, stepOver, feedRate).map((_, index) => (
+            {[0,1,2].map((_, index) => (
               <option key={index} value={index}>Pass {index + 1}</option>
             ))}
           </select>
