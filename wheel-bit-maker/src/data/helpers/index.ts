@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-import { morphLinesAdaptive } from '../../toolpath/morph-lines';
+import { generateGCodeFromSegments, morphLinesAdaptive, planSegmentsFromPasses } from '../../toolpath/morph-lines';
+import { fitArcsInSegments } from '../../toolpath/fir-arcs';
 
 export const generatePath = (props: {  
   stepOver: number, 
@@ -8,8 +9,11 @@ export const generatePath = (props: {
   lineA: PointXYZ[], 
   lineB: PointXYZ[],
   lineB_offset: PointXYZ[];
+  stockRadius: number;
+  bit: IBit;
+  feedRate: number;
 }) => {
-  const {stepOver, lineA, lineB_offset} = props;
+  const { stepOver, lineA, lineB_offset, stockRadius, bit, feedRate } = props;
   const originalLines: PointXYZ[][] = [props.lineStart, props.lineA, props.lineB];
   const lineStart = convertLinesToVector3s(props.lineStart,);
   const morphedLines = morphLinesAdaptive({ lineA, lineB: lineB_offset, stepOver, maxSeg: stepOver });
@@ -17,10 +21,20 @@ export const generatePath = (props: {
   const path=buildRasterPath(morphedLines, 0.1);
   path.unshift(...lineStart);
   
+  const segmentsRaw = planSegmentsFromPasses({
+    passes: path,
+    safeY: stockRadius + bit.diameter / 2 + 2, // 2 mm clearance
+    cutZ:  -0.5,                               // demo depth
+    stepOver,
+    baseFeed: feedRate,
+    plungeFeed: feedRate * 0.4,
+  });
+  const segmentsFitted = fitArcsInSegments(segmentsRaw, { tol: 0.002, arcFrac: 0.8 }); 
   return {
     originalLines,
     morphedLines,
     path,
+    segmentsFitted,
   }
 }
 export const convertLinesToVector3s = (line: PointXYZ[]) => {

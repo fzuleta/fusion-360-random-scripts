@@ -3,7 +3,7 @@ import * as React from 'react'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import styles from './app.module.scss'
 import { STLLoader } from 'three-stdlib';
-import { models } from './data';
+import { models, type IPass } from './data';
 import * as tooth from './nihs_20_30/wheel';
 import { isNumeric } from './helpers';
 import {
@@ -15,12 +15,13 @@ import { fitArcsInSegments } from './toolpath/fir-arcs';
 
 function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
-  const [pass, setPass] = React.useState(0);
+  const [passNum, setPassNum] = React.useState(0);
   // Feed‑rate in mm/min (20 = very slow, 200 = nominal)
   const [feedRate, setFeedRate] = React.useState(120);
   const [stepOver, setStepOver] = React.useState(0.04);
   const [stockRadius] = React.useState(6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
+  const [pass, setPass] = React.useState<IPass | undefined>(undefined);
   // const [lines, setLines] = React.useState<ILinesGotten>();
   const feedRateRef = React.useRef(120);
   const bitMeshRef = React.useRef<THREE.Mesh>(null);
@@ -41,9 +42,8 @@ function App() {
     }
     toolpathGroupRef.current = new THREE.Group();
     sceneRef.current.add(toolpathGroupRef.current);
-
-    const p = getPass();
-    if (!p) { return; }
+ 
+    if (!pass) { return; }
 
     loadMesh();
 
@@ -110,8 +110,8 @@ function App() {
     }
     
 
-    if (pass <= 1 ) {
-      const path: TVector3[] = p.path;
+    if (passNum <= 1 ) {
+      const path: TVector3[] = pass.path;
       pathRef.current = path;            // ← expose to slider
       // build geometry
       const geo = new THREE.BufferGeometry().setFromPoints(path);
@@ -144,19 +144,16 @@ function App() {
       animBit(path);
       return;
     }
-    if (pass === 2) {
+    if (passNum === 2) {
       const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
       pathRef.current = m.path;          // ← expose to slider
       toolpathGroupRef.current.add(m.group);
       animBit(m.path);
       return;
     }
-  }
-  const getPass = () => {
-    const p = modelBit.getPasses(stockRadius, stepOver)[pass]; 
-    return p;
-  }
-  const loadMesh = () => {  
+  } 
+  const loadMesh = () => {
+    if (!pass) { return; }
     // after you create sceneRef.current, camera, renderer, etc.
     const loader = new STLLoader();
     loader.load(modelBit.filename, geometry => {
@@ -187,7 +184,7 @@ function App() {
     //   • radius = 0.5mm  (bit.diameter / 2)
     //   • height = 10mm   (bit.height)
     //     Using 32 radial segments for a reasonably smooth circle.
-    const bit = getPass().bit;
+    const bit = pass.bit;
     // MeshBasicMaterial ignores lights → looks flat.
     // Switch to a PBR‑style material so the cylinder reacts to the Ambient
     // and Directional lights already in the scene.
@@ -229,14 +226,17 @@ function App() {
     draw();
   }, [stepOver]);
   React.useEffect(() => {
-    const p = getPass();
-    console.log("Changing pass to: ", pass, p)
+    if (!modelBit) { return; }
+    setPass(modelBit.getPasses(stockRadius, stepOver, feedRate)[passNum]);
+  }, [passNum]);
+  React.useEffect(() => {
+    console.log("Changing pass to: ", pass)
     if (!sceneRef.current) return;
     draw();
   }, [pass]);
   React.useEffect(() => {
     if (!sceneRef.current) return;
-    setPass(0);
+    setPassNum(0);
     draw();
   }, [modelBit]); 
   React.useEffect(() => {
@@ -332,27 +332,11 @@ function App() {
 
   /** Download the current pass as G‑code (.nc) */
   const handleDownloadGcode = () => {
-    const current = getPass();
+    const current = pass;
     if (!current) return;
 
-    // We rely on `morphedLines` if provided by the pass generator,
-    // else fall back to deriving passes from the displayed path.
-    const passes = (current as any).morphedLines;
-
-    // Fallback safe values if the bit description is missing
-    const bit = (current as any).bit ?? { diameter: 0.4, height: 5 };
-
-    const segmentsRaw = planSegmentsFromPasses({
-      passes,
-      safeY: stockRadius + bit.diameter / 2 + 2, // 2 mm clearance
-      cutZ:  -0.5,                               // demo depth
-      stepOver,
-      baseFeed: feedRate,
-      plungeFeed: feedRate * 0.4,
-    });
-    const segmentsFitted = fitArcsInSegments(segmentsRaw, { tol: 0.002, arcFrac: 0.8 });
     const gcodeLines = generateGCodeFromSegments({
-      segments: segmentsFitted,
+      segments: current.segmentsFitted,
       rotationSteps: 0,
       indexAfterPath: 1,
     });
@@ -388,10 +372,10 @@ return (
         <label>
           Pass:
           <select
-            value={pass}
-            onChange={(e) => setPass(parseInt(e.target.value))}
+            value={passNum}
+            onChange={(e) => setPassNum(parseInt(e.target.value))}
           >
-            {modelBit.getPasses(stockRadius, stepOver).map((_, index) => (
+            {modelBit.getPasses(stockRadius, stepOver, feedRate).map((_, index) => (
               <option key={index} value={index}>Pass {index + 1}</option>
             ))}
           </select>

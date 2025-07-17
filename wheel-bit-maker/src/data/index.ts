@@ -1,12 +1,18 @@
 import * as model_0_13_Z112 from './m0.13/wheel';
 import * as model_0_13_z14 from './m0.13/pinion';
+import type { ToolpathSegment } from '../toolpath/morph-lines';
+
+export type IPass = {
+  bit: IBit,
+  path: TVector3[];
+  originalLines: PointXYZ[][],
+  morphedLines: PointXYZ[][],
+  segmentsFitted: ToolpathSegment[];
+}
 
 interface IModel {
   filename: string;
-  getPasses: (stockRadius: number, stepOver: number) => {
-    bit: IBit,
-    path: TVector3[];
-  }[]
+  getPasses: (stockRadius: number, stepOver: number, feedRate: number) => IPass[];
   points: ISegments;
 }
 export const models: {[key: string]: IModel} = {
