@@ -7,10 +7,8 @@ import { models, type IPass } from './data';
 import * as tooth from './nihs_20_30/wheel';
 import { isNumeric } from './helpers';
 import {
-  planSegmentsFromPasses,
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
-import { fitArcsInSegments } from './toolpath/fir-arcs';
  
 
 function App() {
@@ -225,23 +223,15 @@ function App() {
     feedRateRef.current = feedRate;
   }, [feedRate]);
   React.useEffect(() => {
-    console.log("Changing stepOver to: ", stepOver)
-    draw();
-  }, [stepOver]);
-  React.useEffect(() => {
     if (!modelBit) { return; }
+    console.log("Changing stepOver to: ", stepOver);
     setPass(modelBit.getPasses(stockRadius, stepOver, feedRate)[passNum]);
-  }, [passNum]);
+  }, [feedRate, modelBit, passNum, stockRadius, stepOver]); 
   React.useEffect(() => {
     console.log("Changing pass to: ", pass)
     if (!sceneRef.current) return;
     draw();
   }, [pass]);
-  React.useEffect(() => {
-    if (!sceneRef.current) return;
-    setPassNum(0);
-    draw();
-  }, [modelBit]); 
   React.useEffect(() => {
     const mount = mountRef.current
     if (!mount) return

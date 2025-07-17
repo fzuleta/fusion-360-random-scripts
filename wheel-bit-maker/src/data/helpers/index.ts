@@ -13,15 +13,16 @@ export const generatePath = (props: {
   stockRadius: number;
   bit: IBit;
   feedRate: number;
+  cutZ: number;
 }) => {
-  const { stepOver, lineA, lineB_offset, stockRadius, bit, feedRate } = props;
+  const { stepOver, lineA, lineB_offset, stockRadius, bit, feedRate, cutZ } = props;
   const originalLines: PointXYZ[][] = [props.lineStart, props.lineA, props.lineB];
   const morphedLines = morphLinesAdaptive({ lineA, lineB: lineB_offset, stepOver, maxSeg: stepOver });
   
   const segmentsRaw = planSegmentsFromPasses({
     passes: morphedLines,
     safeY: stockRadius + bit.diameter / 2 + 2, // 2 mm clearance
-    cutZ:  -0.5,                               // demo depth
+    cutZ,                               // -0.5 demo depth
     stepOver,
     baseFeed: feedRate,
     plungeFeed: feedRate * 0.4,

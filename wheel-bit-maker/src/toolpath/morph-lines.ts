@@ -108,8 +108,7 @@ export function planSegmentsFromPasses(props: {
   plungeFeed?: number;  // optional slower plunge / retract feed
 }): ToolpathSegment[] {
   const { passes, safeY, cutZ, stepOver, baseFeed, plungeFeed = baseFeed * 0.4 } = props;
-  const segments: ToolpathSegment[] = [];
-  const feedFor = (so: number) => baseFeed * (so / stepOver);  // naïve linear scaling
+  const segments: ToolpathSegment[] = []; 
 
   for (const line of passes) {
     if (line.length === 0) continue;
@@ -128,13 +127,23 @@ export function planSegmentsFromPasses(props: {
     });
 
     // 3) cutting move along the pass
-    segments.push({
-      kind: 'cut',
-      pts: cutZ === undefined
-        ? line                              // keep incoming z
-        : line.map(p => ({ ...p, z: cutZ })), // flatten if caller insists
-      feed: feedFor(stepOver),
-    });
+    const pts = cutZ === undefined
+      ? line
+      : line.map(p => ({ ...p, z: cutZ }));
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const dy = Math.abs(p1.y - p0.y);
+      const ratio = Math.max(0.2, Math.min(dy / stepOver, 1));
+      const feed = baseFeed * ratio;
+
+      segments.push({
+        kind: 'cut',
+        pts: [p0, p1],
+        feed,
+      });
+    }
     
     // 4) retract back up in Y
     segments.push({ kind: 'retract', pts: [{ x: last.x, y: safeY, z: last.z }], feed: plungeFeed });
@@ -269,7 +278,7 @@ export function generateGCodeFromSegments(props: {
   const hasRotary   = rotationSteps > 0;
   const angleStep   = hasRotary ? 360 / rotationSteps : 0;
   let   currentAngle = 0;
-
+  let lastFeed: number | undefined = undefined;
   const line = (cmd: 'G0' | 'G1', p: PointXYZ, feed?: number) =>
     `${cmd} X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}${feed ? ` F${feed}` : ''}`;
 
@@ -283,6 +292,17 @@ export function generateGCodeFromSegments(props: {
       case 'cut':
         seg.pts.forEach(p => gcode.push(line('G1', p, seg.feed)));
         break;
+      case 'arc': {
+        const [a, b] = seg.pts;
+        const { cx, cy, cw } = seg.arc!;
+        const g = cw ? 'G2' : 'G3';
+        const i = (cx - a.x).toFixed(3);
+        const j = (cy - a.y).toFixed(3);
+        const feed = seg.feed !== undefined && seg.feed !== lastFeed ? ` F${seg.feed}` : '';
+        if (seg.feed !== undefined) lastFeed = seg.feed;
+        gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)} I${i} J${j}${feed}`);
+        break;
+    }
     }
 
     // After every CUT pass, advance the rotary axis once

@@ -106,6 +106,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   // PASS 0
   //=====================================================================
   let bit = bit3_175mm;
+  let cutZ = -0.5;
   let bitRadius = bit.diameter * 0.5;
   // console.log('Getting m0.13 Z112')
   const safeX = (bitRadius + (bitRadius*0.1));
@@ -139,7 +140,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].y += bitRadius;
   
-  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate}) });
+  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   //=====================================================================
   // PASS 1
   //=====================================================================
@@ -165,7 +166,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
-  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stepOver, stockRadius, bit, feedRate}) });
+  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stepOver, stockRadius, bit, feedRate, cutZ}) });
   
   // Pass 3 - tooth
   passes.push({bit: bit3_175mm}); // this is the tooth
