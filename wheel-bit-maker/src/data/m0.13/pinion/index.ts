@@ -161,9 +161,30 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
   passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  //=====================================================================
+  // PASS 2
+  //=====================================================================
+  bit = bit3_175mm;
+  bitRadius = bit.diameter * 0.5
+  cutZ= 0;
+  lineA =  // the inner profile
+    [
+      { x: 2 + bitRadius, y: 0.638 + 1.3 + bitRadius, z },
+      { x: -5.0 + bitRadius, y: 0.638 + 1.3 + bitRadius, z },
+    ];
+  lineB = [ // the border of the stock
+    { x: 2, y: 0.638 + bitRadius, z }, 
+    { x: -5.0, y: 0.638 + bitRadius, z }
+  ];
+  lineB_offset = JSON.parse(JSON.stringify(lineB)); 
+
+  // i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius; 
+  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   
-  // Pass 3 - tooth
-  passes.push({bit: bit3_175mm, path: []}); // this is the tooth
+  //=====================================================================
+  // PASS 3 -- TOOTH
+  //=====================================================================
+  passes.push({bit: bit3_175mm, segmentsForThreeJs: []}); // this is the tooth
   
   return passes;
 }

@@ -108,7 +108,7 @@ function App() {
     }
     
 
-    if (passNum <= 1 ) {
+    if (passNum <= 2 ) {
       const path: TVector3[] = pass.segmentsForThreeJs;
       pathRef.current = path;            // ← expose to slider
       // build geometry
@@ -153,13 +153,12 @@ function App() {
       animBit(path);
       return;
     }
-    if (passNum === 2) {
-      const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
-      pathRef.current = m.path;          // ← expose to slider
-      toolpathGroupRef.current.add(m.group);
-      animBit(m.path);
-      return;
-    }
+    
+    // Draw tooth
+    const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
+    pathRef.current = m.path;          // ← expose to slider
+    toolpathGroupRef.current.add(m.group);
+    animBit(m.path); 
   } 
   const loadMesh = () => {
     if (!pass) { return; }
@@ -376,7 +375,7 @@ return (
             value={passNum}
             onChange={(e) => setPassNum(parseInt(e.target.value))}
           >
-            {[0,1,2].map((_, index) => (
+            {[0, 1, 2, 3].map((_, index) => (
               <option key={index} value={index}>Pass {index + 1}</option>
             ))}
           </select>

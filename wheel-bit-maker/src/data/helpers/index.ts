@@ -26,21 +26,22 @@ export const generatePath = (props: {
     stepOver,
     baseFeed: feedRate,
     plungeFeed: feedRate * 0.4,
-  });
+  }); 
   const segmentsForGcodeFitted = fitArcsInSegments(segmentsRaw, {
     tol: 0.05,      // increase tolerance to allow more deviation
     minPts: 3,      // allow fitting arcs to 3 points instead of 4+
     arcFrac: 1      // keep this as-is to allow full-pass fitting
-  }); 
+  });
   console.log("cut:", segmentsRaw.filter(s => s.kind === 'cut').length);
   console.log("arc:", segmentsForGcodeFitted.filter(s => s.kind === 'arc').length);
   return {
     originalLines,
     morphedLines,
-    segmentsForThreeJs: segmentsToVectorPath(segmentsForGcodeFitted), // for THREE to draw
+    segmentsForThreeJs: segmentsToVectorPath(segmentsForGcodeFitted, 1.5), // for THREE to draw
     segmentsForGcodeFitted, // for GCODE to export
   }
 }
+
 export const convertLinesToVector3s = (line: PointXYZ[]) => {
   const path: THREE.Vector3[] = [];
   for (const p of line) {
@@ -137,8 +138,8 @@ export function segmentsToVectorPath(
         const span = cw
           ? (a0 > a1 ? a0 - a1 : a0 - a1 + 2 * Math.PI)
           : (a1 > a0 ? a1 - a0 : a1 - a0 + 2 * Math.PI);
-        const steps = Math.max(2, Math.ceil(r * span / arcRes));
-
+        // const steps = Math.max(2, Math.ceil(r * span / arcRes));
+        const steps = Math.min(200, Math.max(2, Math.ceil(r * span / arcRes)));
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const ang = cw ? a0 - span * t : a0 + span * t;
