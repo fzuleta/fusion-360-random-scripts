@@ -119,14 +119,22 @@ function App() {
       const cEnd   = new THREE.Color(0xffff00);   // yellow
       const colours: number[] = [];
 
-      const last = path.length - 1;
+      const last = path.length - 1; 
       path.forEach((p: TVector3, i) => {
-        if (p.isRapid)  { colours.push(0,1,1); }    // cyan
-        else if (p.isRetract) { colours.push(1,0,1);} // magenta
-        else {
-          const t = last === 0 ? 0 : i / last;      // 0 → 1 along the line
-          const col = cStart.clone().lerp(cEnd, t); // interpolate
-          colours.push(col.r, col.g, col.b);        // push r-g-b
+        if (p.isArc) {
+          // green arcs
+          colours.push(0, 1, 0);
+        } else if (p.isRapid) {
+          // cyan
+          colours.push(0, 1, 1);
+        } else if (p.isRetract) {
+          // magenta
+          colours.push(1, 0, 1);
+        } else {
+          // default cut: red → yellow gradient
+          const t = last === 0 ? 0 : i / last;
+          const col = cStart.clone().lerp(cEnd, t);
+          colours.push(col.r, col.g, col.b);
         }
       });
 

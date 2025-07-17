@@ -27,8 +27,13 @@ export const generatePath = (props: {
     baseFeed: feedRate,
     plungeFeed: feedRate * 0.4,
   });
-  const segmentsForGcodeFitted = fitArcsInSegments(segmentsRaw, { tol: 0.002, arcFrac: 0.8 }); 
-  
+  const segmentsForGcodeFitted = fitArcsInSegments(segmentsRaw, {
+    tol: 0.05,      // increase tolerance to allow more deviation
+    minPts: 3,      // allow fitting arcs to 3 points instead of 4+
+    arcFrac: 1      // keep this as-is to allow full-pass fitting
+  }); 
+  console.log("cut:", segmentsRaw.filter(s => s.kind === 'cut').length);
+  console.log("arc:", segmentsForGcodeFitted.filter(s => s.kind === 'arc').length);
   return {
     originalLines,
     morphedLines,
@@ -105,10 +110,11 @@ export function segmentsToVectorPath(
 ): TVector3[] {
   const out: TVector3[] = [];
 
-  const push = (v: THREE.Vector3, kind: 'cut'|'retract'|'rapid') => {
+  const push = (v: THREE.Vector3, kind: 'cut'|'retract'|'rapid'|'arc') => {
     (v as TVector3).isCut      = kind === 'cut';
     (v as TVector3).isRetract  = kind === 'retract';
     (v as TVector3).isRapid    = kind === 'rapid';
+    (v as TVector3).isArc      = kind === 'arc';
     out.push(v as TVector3);
   };
 
@@ -123,24 +129,21 @@ export function segmentsToVectorPath(
                s.kind === 'cut' ? 'cut' : 'retract')
         );
         break;
-
       case 'arc': {
-        const [a,b] = s.pts;
+        const [a, b] = s.pts;
         const { cx, cy, r, cw } = s.arc!;
-        const a0   = Math.atan2(a.y - cy, a.x - cx);
-        const a1   = Math.atan2(b.y - cy, b.x - cx);
+        const a0 = Math.atan2(a.y - cy, a.x - cx);
+        const a1 = Math.atan2(b.y - cy, b.x - cx);
         const span = cw
-          ? (a0 > a1 ? a0 - a1 : a0 - a1 + 2*Math.PI)
-          : (a1 > a0 ? a1 - a0 : a1 - a0 + 2*Math.PI);
+          ? (a0 > a1 ? a0 - a1 : a0 - a1 + 2 * Math.PI)
+          : (a1 > a0 ? a1 - a0 : a1 - a0 + 2 * Math.PI);
         const steps = Math.max(2, Math.ceil(r * span / arcRes));
 
         for (let i = 0; i <= steps; i++) {
-          const t = cw ? -i/steps : i/steps;
-          const ang = a0 + span * t;
-          push(
-            new THREE.Vector3(cx + r*Math.cos(ang), cy + r*Math.sin(ang), a.z),
-            'cut'
-          );
+          const t = i / steps;
+          const ang = cw ? a0 - span * t : a0 + span * t;
+          const z = a.z + (b.z - a.z) * t;
+          push(new THREE.Vector3(cx + r * Math.cos(ang), cy + r * Math.sin(ang), z), 'cut');
         }
         break;
       }
