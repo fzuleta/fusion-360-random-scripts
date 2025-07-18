@@ -155,6 +155,41 @@ export function segmentsToVectorPath(
 }
 
 /**
+ * Insert intermediate points so that no segment is longer than `maxSeg` (mm).
+ * This is purely for visual smoothness; the extra points are NOT sent to the
+ * G‑code exporter.
+ */
+export function densifyPath(
+  path: TVector3[],
+  maxSeg = 0.2   // mm
+): TVector3[] {
+  if (path.length < 2) return path.slice();
+  const out: TVector3[] = [path[0]];
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const dist = a.distanceTo(b);
+    const steps = Math.max(1, Math.ceil(dist / maxSeg));
+    for (let k = 1; k <= steps; k++) {
+      const t = k / steps;
+      const p = a.clone().lerp(b, t) as TVector3;
+      // copy semantic flags only for the final point of the segment so
+      // animation colour coding still works.
+      if (k === steps) {
+        p.isCut     = b.isCut;
+        p.isRetract = b.isRetract;
+        p.isRapid   = b.isRapid;
+        p.isArc     = b.isArc;
+      } else {
+        p.isCut = a.isCut;  // treat mids as the same kind as segment start
+      }
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+/**
  * Convert a display‑path (TVector3[]) into raw ToolpathSegment[]
  * preserving cut / retract / rapid semantics for the G‑code exporter.
  */
@@ -184,15 +219,22 @@ export function pathToSegments(path: TVector3[]): ToolpathSegment[] {
  * `generatePath` uses for the first passes.
  */
 export const generateToothPath = (path: TVector3[]) => {
-  const raw     = pathToSegments(path);
+  const raw     = pathToSegments(densifyPath(path, 0.2));
   const fitted  = fitArcsInSegments(raw, {
     tol: 0.05,
     minPts: 3,
     arcFrac: 1,
   });
 
+
+  const segmentsForThreeJs = segmentsToVectorPath(fitted, 1.5);
+  // For preview/animation we keep the **original path** – it already
+  // contains many intermediate points (every `state.speed` from
+  // wheel.getMesh).  Using it directly gives smooth motion, whereas the
+  // fitted‑segments representation collapses long moves to just two
+  // endpoints.
   return {
-    segmentsForThreeJs: segmentsToVectorPath(fitted, 1.5),
+    segmentsForThreeJs, // smoother preview
     segmentsForGcodeFitted: fitted,
   };
 };
