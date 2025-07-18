@@ -153,3 +153,74 @@ export function segmentsToVectorPath(
   // remove duplicates
   return out.filter((p,i,arr)=> i===0 || !p.equals(arr[i-1]));
 }
+
+/**
+ * Convert a display‑path (TVector3[]) into raw ToolpathSegment[]
+ * preserving cut / retract / rapid semantics for the G‑code exporter.
+ */
+export function pathToSegments(path: TVector3[]): ToolpathSegment[] {
+  const segs: ToolpathSegment[] = [];
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i];
+    const b = path[i + 1];
+    if (a.equals(b)) continue;                // skip zero‑length hops
+    const kind =
+      a.isCut      ? 'cut'     :
+      a.isRetract  ? 'retract' :
+      'rapid';
+    segs.push({
+      kind,
+      pts: [
+        { x: a.x, y: a.y, z: a.z },
+        { x: b.x, y: b.y, z: b.z },
+      ],
+    } as ToolpathSegment);
+  }
+  return segs;
+}
+
+/**
+ * Feed a raster path through the same preview / G‑code pipeline that
+ * `generatePath` uses for the first passes.
+ */
+export const generateToothPath = (path: TVector3[]) => {
+  const raw     = pathToSegments(path);
+  const fitted  = fitArcsInSegments(raw, {
+    tol: 0.05,
+    minPts: 3,
+    arcFrac: 1,
+  });
+
+  return {
+    segmentsForThreeJs: segmentsToVectorPath(fitted, 1.5),
+    segmentsForGcodeFitted: fitted,
+  };
+};
+
+
+export const createBitMesh = (bit: IBit) => {
+  // MeshBasicMaterial ignores lights → looks flat.
+  // Switch to a PBR‑style material so the cylinder reacts to the Ambient
+  // and Directional lights already in the scene.
+  const bitMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8e98b3,       // same hue
+    metalness: 0.7,        // slight metallic sheen
+    roughness: 0.3,        // enough gloss to catch highlights
+    side: THREE.DoubleSide // keep both faces visible if needed
+  });
+  const bitGeometru = new THREE.CylinderGeometry(
+    bit.diameter / 2,   // radiusTop
+    bit.diameter / 2,   // radiusBottom
+    bit.height,         // height (along local +Y)
+    32                  // radial segments
+  );
+
+  // Shift the geometry down so its *bottom* face sits at the local origin.
+  // (Mesh is later placed with position.y = 0 so the wheel rests on the ground plane.)
+  bitGeometru.translate(0, -bit.height / 2, 0);  
+  bitGeometru.rotateX(-Math.PI / 2); // Rotate so the rectangle lies in the X‑Z plane (normal +Y)
+  const bitMesh = new THREE.Mesh(bitGeometru, bitMaterial);
+  bitMesh.position.set(10, 10, 0)
+  
+  return bitMesh;
+}

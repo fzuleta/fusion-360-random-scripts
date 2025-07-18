@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { bit1mm, bit3_175mm, cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
-import { generatePath } from '../../helpers';
+import { createBitMesh, generatePath, generateToothPath } from '../../helpers';
+
+import * as wheel from '../../../nihs_20_30/wheel';
 
 export const filename = 'm=0.13 z=14.stl';
  
@@ -102,6 +104,7 @@ export const points: ISegments = {
 export const getPasses = (stockRadius: number, stepOver: number, feedRate: number) => {
   const passes: any = [];
   let bit = bit3_175mm;
+  let bitMesh: THREE.Mesh;
   let cutZ = -0.5;
   let bitRadius = bit.diameter * 0.5;
   const safeX = (bitRadius + (bitRadius*0.1));
@@ -110,6 +113,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   //=====================================================================
   // PASS 0
   //===================================================================== 
+  bitMesh = createBitMesh(bit);
   const lineStart = [
     { x: safeX, y: safeY, z }, 
     { x: safeX, y: stockRadius, z }, 
@@ -136,11 +140,12 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].y += bitRadius;
-  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   //=====================================================================
   // PASS 1
   //=====================================================================
   bit = bit1mm;
+  bitMesh = createBitMesh(bit);
   bitRadius = bit.diameter * 0.5
   lineA = [ // the border of the stock
     { x: 0, y: 1.5, z }, 
@@ -160,11 +165,12 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
-  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   //=====================================================================
   // PASS 2
   //=====================================================================
   bit = bit3_175mm;
+  bitMesh = createBitMesh(bit);
   bitRadius = bit.diameter * 0.5
   cutZ= 0;
   lineA =  // the inner profile
@@ -179,12 +185,26 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   lineB_offset = JSON.parse(JSON.stringify(lineB)); 
 
   // i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius; 
-  passes.push({ bit, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   
   //=====================================================================
   // PASS 3 -- TOOTH
   //=====================================================================
-  passes.push({bit: bit3_175mm, segmentsForThreeJs: []}); // this is the tooth
+  bit = bit3_175mm;
+  bitMesh = createBitMesh(bit);
+  const { path } = wheel.getMesh(points, stepOver, bitMesh);
+
+  const {
+    segmentsForThreeJs,
+    segmentsForGcodeFitted,
+  } = generateToothPath(path);
+
+  passes.push({
+    bit: bit3_175mm,
+    bitMesh,
+    segmentsForThreeJs,
+    segmentsForGcodeFitted,
+  }); 
   
   return passes;
 }

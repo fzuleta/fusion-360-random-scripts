@@ -3,8 +3,7 @@ import * as React from 'react'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import styles from './app.module.scss'
 import { STLLoader } from 'three-stdlib';
-import { models, type IPass } from './data';
-import * as tooth from './nihs_20_30/wheel';
+import { models, type IPass } from './data'; 
 import { isNumeric } from './helpers';
 import {
   generateGCodeFromSegments, 
@@ -108,57 +107,40 @@ function App() {
     }
     
 
-    if (passNum <= 2 ) {
+    if (pass.segmentsForThreeJs && pass.segmentsForThreeJs.length) {
       const path: TVector3[] = pass.segmentsForThreeJs;
       pathRef.current = path;            // ← expose to slider
+
       // build geometry
       const geo = new THREE.BufferGeometry().setFromPoints(path);
 
-      // ── create a red → yellow gradient ───────────────────────────────
+      // ── create a red → yellow gradient ──────────────────────────────
       const cStart = new THREE.Color(0xff0000);   // red
       const cEnd   = new THREE.Color(0xffff00);   // yellow
       const colours: number[] = [];
 
-      const last = path.length - 1; 
+      const last = path.length - 1;
       path.forEach((p: TVector3, i) => {
         if (p.isArc) {
-          // green arcs
-          colours.push(0, 1, 0);
+          colours.push(0, 1, 0);          // green arcs
         } else if (p.isRapid) {
-          // cyan
-          colours.push(0, 1, 1);
+          colours.push(0, 1, 1);          // cyan rapids
         } else if (p.isRetract) {
-          // magenta
-          colours.push(1, 0, 1);
+          colours.push(1, 0, 1);          // magenta retracts
         } else {
-          // default cut: red → yellow gradient
           const t = last === 0 ? 0 : i / last;
           const col = cStart.clone().lerp(cEnd, t);
           colours.push(col.r, col.g, col.b);
         }
       });
 
-      // attach the colour buffer (3 floats per vertex)
       geo.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
-
-      // material that respects vertex colours
       const mat  = new THREE.LineBasicMaterial({ vertexColors: true });
       const line = new THREE.Line(geo, mat);
       toolpathGroupRef.current.add(line);
-      // console.log(JSON.stringify(path)) 
-      // const geo  = new THREE.BufferGeometry().setFromPoints(path);
-      // const mat  = new THREE.LineBasicMaterial({ color: 0xffffff });
-      // const line = new THREE.Line(geo, mat);
-      toolpathGroupRef.current.add(line); 
       animBit(path);
       return;
     }
-    
-    // Draw tooth
-    const m = tooth.getMesh(modelBit.points, stepOver, bitMeshRef.current!);
-    pathRef.current = m.path;          // ← expose to slider
-    toolpathGroupRef.current.add(m.group);
-    animBit(m.path); 
   } 
   const loadMesh = () => {
     if (!pass) { return; }
@@ -188,32 +170,8 @@ function App() {
       toolpathGroupRef.current!.add(mesh); 
     });
 
-    // ── Wheel modelled as a thin CYLINDER ────────────────
-    //   • radius = 0.5mm  (bit.diameter / 2)
-    //   • height = 10mm   (bit.height)
-    //     Using 32 radial segments for a reasonably smooth circle.
-    const bit = pass.bit;
-    // MeshBasicMaterial ignores lights → looks flat.
-    // Switch to a PBR‑style material so the cylinder reacts to the Ambient
-    // and Directional lights already in the scene.
-    const bitMaterial = new THREE.MeshStandardMaterial({
-      color: 0x8e98b3,       // same hue
-      metalness: 0.7,        // slight metallic sheen
-      roughness: 0.3,        // enough gloss to catch highlights
-      side: THREE.DoubleSide // keep both faces visible if needed
-    });
-    const bitGeometru = new THREE.CylinderGeometry(
-      bit.diameter / 2,   // radiusTop
-      bit.diameter / 2,   // radiusBottom
-      bit.height,         // height (along local +Y)
-      32                  // radial segments
-    );
-  
-    // Shift the geometry down so its *bottom* face sits at the local origin.
-    // (Mesh is later placed with position.y = 0 so the wheel rests on the ground plane.)
-    bitGeometru.translate(0, -bit.height / 2, 0);  
-    bitGeometru.rotateX(-Math.PI / 2); // Rotate so the rectangle lies in the X‑Z plane (normal +Y)
-    const bitMesh = new THREE.Mesh(bitGeometru, bitMaterial);
+    // ── Wheel modelled as a thin CYLINDER ──────────────── 
+    const bitMesh = pass.bitMesh;
     bitMeshRef.current = bitMesh;
     bitMesh.position.set(10, 10, 0)
     toolpathGroupRef.current!.add(bitMesh);
