@@ -270,6 +270,9 @@ export function generateGCodeFromSegments(props: {
   segments: ToolpathSegment[];
   /** If ≤ 0 or omitted, NO A-axis moves are emitted. */
   rotationSteps?: number;
+  startAngle?: number;          // NEW: default 0
+  endAngle?: number;            // NEW: if defined, used with startAngle to compute angleStep
+  
   /** One-off rotary index after the entire tool-path (deg). */
   indexAfterPath?: number;
 }): string[] {
@@ -287,45 +290,52 @@ export function generateGCodeFromSegments(props: {
   'G4 P1' ,                   // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
   'M8',                       // air / coolant on
   'G54',                      // work offset
-  'G0 A0.',                   // zero the rotary
   `G43 Z15.0 H${bit.toolNumber}`, // length offset + safe height
 ];
 
   const hasRotary   = rotationSteps > 0;
-  const angleStep   = hasRotary ? 360 / rotationSteps : 0;
-  let   currentAngle = 0;
+  const aStart = props.startAngle ?? 0;
+  const aEnd = props.endAngle ?? 360;
+  const totalAngle = aEnd - aStart;
+  const angleStep = hasRotary ? totalAngle / rotationSteps : 0;
+
+  if (hasRotary) {
+    gcode.push(`G0 A${aStart.toFixed(3)}    ; set rotary start`);
+  }
+
   let lastFeed: number | undefined = undefined;
   const line = (cmd: 'G0' | 'G1', p: PointXYZ, feed?: number) =>
     `${cmd} X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}${feed ? ` F${feed}` : ''}`;
 
-  for (const seg of segments) {
-    switch (seg.kind) {
-      case 'rapid':
-        seg.pts.forEach(p => gcode.push(line('G0', p)));
-        break;
-      case 'plunge':
-      case 'retract':
-      case 'cut':
-        seg.pts.forEach(p => gcode.push(line('G1', p, seg.feed)));
-        break;
-      case 'arc': {
-        const [a, b] = seg.pts;
-        const { cx, cy, cw } = seg.arc!;
-        const g = cw ? 'G2' : 'G3';
-        const i = (cx - a.x).toFixed(3);
-        const j = (cy - a.y).toFixed(3);
-        const feed = seg.feed !== undefined && seg.feed !== lastFeed ? ` F${seg.feed}` : '';
-        if (seg.feed !== undefined) lastFeed = seg.feed;
-        gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)} I${i} J${j}${feed}`);
-        break;
-    }
+  for (let step = 0; step < rotationSteps || (!hasRotary && step === 0); step++) {
+    const currentAngle = aStart + step * angleStep;
+    if (hasRotary) {
+      gcode.push(`G1 A${currentAngle.toFixed(3)}`);
     }
 
-    // After every CUT pass, advance the rotary axis once
-    if (hasRotary && seg.kind === 'cut') {
-      gcode.push(`G1 A${currentAngle.toFixed(3)}`);
-      currentAngle += angleStep;
-    } 
+    for (const seg of segments) {
+      switch (seg.kind) {
+        case 'rapid':
+          seg.pts.forEach(p => gcode.push(line('G0', p)));
+          break;
+        case 'plunge':
+        case 'retract':
+        case 'cut':
+          seg.pts.forEach(p => gcode.push(line('G1', p, seg.feed)));
+          break;
+        case 'arc': {
+          const [a, b] = seg.pts;
+          const { cx, cy, cw } = seg.arc!;
+          const g = cw ? 'G2' : 'G3';
+          const i = (cx - a.x).toFixed(3);
+          const j = (cy - a.y).toFixed(3);
+          const feed = seg.feed !== undefined && seg.feed !== lastFeed ? ` F${seg.feed}` : '';
+          if (seg.feed !== undefined) lastFeed = seg.feed;
+          gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)} I${i} J${j}${feed}`);
+          break;
+        }
+      }
+    }
   }
   // Optional single index after finishing the whole path
   if (!hasRotary && typeof indexAfterPath === 'number') {

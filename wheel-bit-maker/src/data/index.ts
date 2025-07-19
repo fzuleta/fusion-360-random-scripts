@@ -9,6 +9,9 @@ export type IPass = {
   originalLines: PointXYZ[][], 
   segmentsForThreeJs: TVector3[][],
   segmentsForGcodeFitted  : ToolpathSegment[];
+  rotationSteps?: number;
+  startAngle?: number;
+  endAngle?: number;
 }
 
 interface IModel {

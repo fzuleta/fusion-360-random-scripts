@@ -26,7 +26,7 @@ function App() {
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
   const toolpathGroupRef = React.useRef<THREE.Group | null>(null); 
   const orbitControlsRef = React.useRef<OrbitControls | undefined>(undefined);
-  const [renderer, setRenderer] = React.useState<THREE.WebGLRenderer>();
+  const [_renderer, setRenderer] = React.useState<THREE.WebGLRenderer>();
 
   const [scrub, setScrub] = React.useState(0);            // 0‑100 %
   const isScrubbingRef = React.useRef(false);
@@ -140,6 +140,35 @@ function App() {
       const mat  = new THREE.LineBasicMaterial({ vertexColors: true });
       const line = new THREE.Line(geo, mat);
       toolpathGroupRef.current.add(line);
+
+      if (pass.startAngle !== undefined && pass.endAngle !== undefined && pass.rotationSteps !== undefined) {
+        const radius = 3; // distance from X-axis 
+        const angleStep = (pass.endAngle - pass.startAngle) / pass.rotationSteps;
+        const circlePoints: THREE.Vector3[] = [];
+
+        for (let i = 0; i <= pass.rotationSteps; i++) {
+          const angleDeg = pass.startAngle + i * angleStep;
+          const angleRad = degToRad(angleDeg);
+          const y = radius * Math.cos(angleRad);
+          const z = radius * Math.sin(angleRad);
+          circlePoints.push(new THREE.Vector3(0, y, z)); // X is constant
+        }
+
+        const circleGeometry = new THREE.BufferGeometry().setFromPoints(circlePoints);
+        const circleMaterial = new THREE.LineBasicMaterial({ color: 0x6666ff });
+        const circleLine = new THREE.Line(circleGeometry, circleMaterial);
+        toolpathGroupRef.current.add(circleLine);
+
+        // Add small spheres at each rotation step
+        const sphereGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+        const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x9999ff });
+        for (const pt of circlePoints) {
+          const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+          sphere.position.copy(pt);
+          toolpathGroupRef.current.add(sphere);
+        }
+      }
+
       animBit(path);
       return;
     }
@@ -302,7 +331,9 @@ function App() {
     const gcodeLines = generateGCodeFromSegments({
       segments: current.segmentsForGcodeFitted,
       bit: current.bit,
-      rotationSteps: 0,
+      rotationSteps: pass.rotationSteps,
+      startAngle: pass.startAngle,
+      endAngle: pass.endAngle,
       indexAfterPath: 1,
     });
 

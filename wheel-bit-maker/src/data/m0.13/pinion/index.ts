@@ -3,6 +3,7 @@ import { bit1mm, bit3_175mm, cloneSegment, convertPointToSegment, reverseSegment
 import { createBitMesh, generatePath, generateToothPath } from '../../helpers';
 
 import * as wheel from '../../../nihs_20_30/wheel';
+import type { IPass } from '../..';
 
 export const filename = 'm=0.13 z=14.stl';
 
@@ -102,7 +103,7 @@ export const points: ISegments = {
 }
 
 export const getPasses = (stockRadius: number, stepOver: number, feedRate: number) => {
-  const passes: any = [];
+  const passes: IPass[] = [];
   //=====================================================================
   // PASS 0 - Rough shape
   //=====================================================================
@@ -165,7 +166,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
-    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB: lineB_offset, stepOver, stockRadius, bit, feedRate, cutZ}) });
+    passes.push({ bit, bitMesh, rotationSteps: 360 / 3, startAngle: 0, endAngle: 360, ...generatePath({ lineA, lineB: lineB_offset, stepOver, stockRadius, bit, feedRate, cutZ}) });
   }
   //=====================================================================
   // PASS 2 - Side flatten
@@ -187,7 +188,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       { x: -5.0, y: 0.7 + bitRadius, z }
     ]; 
  
-    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    passes.push({ bit, bitMesh, rotationSteps: 360 / 3, startAngle: 0, endAngle: 360, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
   }
   //=====================================================================
   // PASS 3 - Top flatten relief angles
@@ -231,6 +232,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       bitMesh,
       segmentsForThreeJs,
       segmentsForGcodeFitted,
+      originalLines: []
     }); 
   }
   // ------------------- 
