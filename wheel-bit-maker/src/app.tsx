@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import styles from './app.module.scss'
 import { STLLoader } from 'three-stdlib';
 import { models, type IPass } from './data'; 
-import { isNumeric } from './helpers';
+import { degToRad, isNumeric } from './helpers';
 import {
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
@@ -160,13 +160,15 @@ function App() {
       console.log(`STL bounds: ${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)} mm`);
 
       // ── 2️⃣  Centre the mesh on origin but **do not scale** ────────────────
-      // Shift so the **far‑right (max X) mid‑height, mid‑depth** becomes origin
+      // Shift so the **far‑left (min X) mid‑height, mid‑depth** becomes origin
       const centre = new THREE.Vector3(
-        box.max.x,                               // far right in X
-        (box.min.y + box.max.y) / 2,            // middle of Y
-        (box.min.z + box.max.z) / 2             // middle of Z
+        box.min.x,                               // far left in X
+        (box.min.y + box.max.y) / 2,             // middle of Y
+        (box.min.z + box.max.z) / 2              // middle of Z
       );
-      mesh.position.sub(centre);                // translate so that point → (0,0,0)
+      mesh.rotateZ(degToRad(180));                     // rotate 180 degrees around Z
+      mesh.position.set(centre.x, centre.y, centre.z);                // translate so that point → (0,0,0)
+      // mesh.position.set(-0.165, 6 + 2.455, 0);                // move to origin
       toolpathGroupRef.current!.add(mesh); 
     });
 
@@ -333,7 +335,7 @@ return (
             value={passNum}
             onChange={(e) => setPassNum(parseInt(e.target.value))}
           >
-            {[0, 1, 2, 3].map((_, index) => (
+            {[0, 1, 2, 3, 4].map((_, index) => (
               <option key={index} value={index}>Pass {index + 1}</option>
             ))}
           </select>

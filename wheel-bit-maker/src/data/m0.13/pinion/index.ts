@@ -140,7 +140,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].y += bitRadius;
-  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   //=====================================================================
   // PASS 1
   //=====================================================================
@@ -165,7 +165,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
   i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
-  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   //=====================================================================
   // PASS 2
   //=====================================================================
@@ -185,7 +185,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   lineB_offset = JSON.parse(JSON.stringify(lineB)); 
 
   // i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius; 
-  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   
   //=====================================================================
   // PASS 3 -- TOOTH

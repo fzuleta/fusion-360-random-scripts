@@ -8,20 +8,30 @@ export const generatePath = (props: {
   stepOver: number, 
   lineStart: PointXYZ[], 
   lineA: PointXYZ[], 
-  lineB: PointXYZ[],
-  lineB_offset: PointXYZ[];
+  lineB: PointXYZ[], 
   stockRadius: number;
   bit: IBit;
   feedRate: number;
   cutZ: number;
+  passDirection?: 'top-to-bottom' | 'bottom-to-top';   // NEW
 }) => {
-  const { stepOver, lineA, lineB_offset, stockRadius, bit, feedRate, cutZ } = props;
+  const { stepOver, lineA, lineB, stockRadius, bit, feedRate, cutZ, 
+    passDirection = 'top-to-bottom',      // default as today
+  } = props;
   const originalLines: PointXYZ[][] = [props.lineStart, props.lineA, props.lineB];
-  const morphedLines = morphLinesAdaptive({ lineA, lineB: lineB_offset, stepOver, maxSeg: stepOver });
+  const morphedLines = morphLinesAdaptive({ lineA, lineB, stepOver, maxSeg: stepOver });
+  
+  const passesForMachining =
+    passDirection === 'bottom-to-top' ? [...morphedLines].reverse() : morphedLines;
+  
+    // --- choose clearance plane once -------------------------------
+  const clearance = stockRadius + bit.diameter / 2 + 2;   // same formula
+  const safeY =
+    passDirection === 'bottom-to-top' ? -clearance : clearance;
   
   const segmentsRaw = planSegmentsFromPasses({
-    passes: morphedLines,
-    safeY: stockRadius + bit.diameter / 2 + 2, // 2 mm clearance
+    passes: passesForMachining,
+    safeY, // 2 mm clearance
     cutZ,                               // -0.5 demo depth
     stepOver,
     baseFeed: feedRate,
