@@ -8,7 +8,7 @@ import { degToRad, isNumeric } from './helpers';
 import {
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
- 
+import { Overlay } from './components/overlay';
 
 function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
@@ -25,6 +25,8 @@ function App() {
   const mountRef = React.useRef<HTMLDivElement>(null);
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
   const toolpathGroupRef = React.useRef<THREE.Group | null>(null); 
+  const orbitControlsRef = React.useRef<OrbitControls | undefined>(undefined);
+  const [renderer, setRenderer] = React.useState<THREE.WebGLRenderer>();
 
   const [scrub, setScrub] = React.useState(0);            // 0‑100 %
   const isScrubbingRef = React.useRef(false);
@@ -232,8 +234,10 @@ function App() {
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(mount.clientWidth, mount.clientHeight)
     mount.appendChild(renderer.domElement)
+    setRenderer(renderer);
     
     const controls = new OrbitControls(camera, renderer.domElement)
+    orbitControlsRef.current = controls;
     controls.enableDamping = false
     controls.dampingFactor = 0.05
     controls.screenSpacePanning = false
@@ -246,7 +250,7 @@ function App() {
     controls.update();
 
     // Add grid helper
-    const gridHelper = new THREE.GridHelper(100, 100, 0x333333, 0x333333)
+    const gridHelper = new THREE.GridHelper(100, 100, 0x000000, 0x3f3f3f)
     gridHelper.rotation.x = Math.PI / 2 // rotate from XZ to XY
 
     sceneRef.current.add(gridHelper)
@@ -397,6 +401,7 @@ return (
       </div>
       
     </div>
+    <Overlay pass={ pass } toolpathGroupRef={toolpathGroupRef} />
     <div ref={mountRef} className={styles.canvas} />
   </div>
 )

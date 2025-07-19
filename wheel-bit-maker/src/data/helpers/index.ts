@@ -5,8 +5,7 @@ import { fitArcsInSegments } from '../../toolpath/fir-arcs';
 
 
 export const generatePath = (props: {  
-  stepOver: number, 
-  lineStart: PointXYZ[], 
+  stepOver: number,  
   lineA: PointXYZ[], 
   lineB: PointXYZ[], 
   stockRadius: number;
@@ -18,7 +17,7 @@ export const generatePath = (props: {
   const { stepOver, lineA, lineB, stockRadius, bit, feedRate, cutZ, 
     passDirection = 'top-to-bottom',      // default as today
   } = props;
-  const originalLines: PointXYZ[][] = [props.lineStart, props.lineA, props.lineB];
+  const originalLines: PointXYZ[][] = [props.lineA, props.lineB];
   const morphedLines = morphLinesAdaptive({ lineA, lineB, stepOver, maxSeg: stepOver });
   
   const passesForMachining =

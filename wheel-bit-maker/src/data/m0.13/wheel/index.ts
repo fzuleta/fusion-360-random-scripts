@@ -110,16 +110,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     const bit = bit3_175mm;
     const bitMesh = createBitMesh(bit);
     const cutZ = -0.5;
-    const bitRadius = bit.diameter * 0.5;
-    // console.log('Getting m0.13 Z112')
-    const safeX = (bitRadius + (bitRadius*0.1));
-    const safeY = (stockRadius + bitRadius + 2);
-    const lineStart = [
-      { x: safeX, y: safeY, z: cutZ }, 
-      { x: safeX, y: stockRadius, z: cutZ }, 
-      { x: 0, y: stockRadius, z: cutZ }
-    ];
-    lineStart.forEach(it => it.y += bitRadius);
+    const bitRadius = bit.diameter * 0.5; 
 
     const lineA = [ // the border of the stock
       { x: 3, y: stockRadius, z: cutZ }, 
@@ -143,7 +134,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].y += bitRadius;
     
-    passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
   }
   //=====================================================================
   // PASS 1 - rough shape more detail
@@ -153,14 +144,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     const bitMesh = createBitMesh(bit);
     const bitRadius = bit.diameter * 0.5
     const cutZ = -0.5;
-    const z = cutZ;
-    const safeX = (bitRadius + (bitRadius*0.1));
-    const safeY = (stockRadius + bitRadius + 2); 
-    const lineStart = [
-      { x: safeX, y: safeY, z }, 
-      { x: safeX, y: stockRadius, z }, 
-      { x: 0, y: stockRadius, z }
-    ];
+    const z = cutZ; 
     const lineA = [ // the border of the stock
       { x: 1, y: 2, z }, 
       { x: -3.0, y: 2, z }
@@ -180,37 +164,29 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
-    passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stepOver, stockRadius, bit, feedRate, cutZ}) });
+    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB: lineB_offset, stepOver, stockRadius, bit, feedRate, cutZ}) });
   }
   //=====================================================================
-  // PASS 2 - NOT SURE IF THIS IS NEEDED
+  // PASS 2 - Side flatten
   //=====================================================================
   {
     const bit = bit3_175mm;
     const bitMesh = createBitMesh(bit);
     const bitRadius = bit.diameter * 0.5
     const cutZ= 0;
-    const z = cutZ;
-
-    const safeX = (bitRadius + (bitRadius*0.1));
-    const safeY = (stockRadius + bitRadius + 2); 
-    const lineStart = [
-      { x: safeX, y: safeY, z }, 
-      { x: safeX, y: stockRadius, z }, 
-      { x: 0, y: stockRadius, z }
-    ];
+    const z = cutZ; 
 
     const lineA =  // the inner profile
       [
-        { x: 2 + bitRadius, y: 0.638 + 1.3 + bitRadius, z },
-        { x: -5.0 + bitRadius, y: 0.638 + 1.3 + bitRadius, z },
+        { x: 2 + bitRadius, y: 0.2 + 1.32 + bitRadius, z }, // 1.3 is the diameter of the outer disk , I added 0.02 as stock leftover
+        { x: -5.0 + bitRadius, y: 0.2 + 1.32 + bitRadius, z }, // 1.3 is the diameter of the outer disk, I added 0.02 as stock leftover
       ];
     const lineB = [ // the border of the stock
-      { x: 2, y: 0.638 + bitRadius, z }, 
-      { x: -5.0, y: 0.638 + bitRadius, z }
+      { x: 2, y: 0.7 + bitRadius, z }, 
+      { x: -5.0, y: 0.7 + bitRadius, z }
     ]; 
  
-    passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
   }
   //=====================================================================
   // PASS 3 - Top flatten relief angles
@@ -220,14 +196,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     const bitMesh = createBitMesh(bit);
     const bitRadius = bit.diameter * 0.5
     const cutZ= 0.68;
-    const z = cutZ;
-
-    const safeX = (bitRadius + (bitRadius*0.1));
-    const safeY = (- bitRadius - 2); 
-    const lineStart = [
-      { x: safeX, y: safeY, z },
-      { x: safeX + 1, y: safeY, z },
-    ];
+    const z = cutZ; 
 
     const lineA = [ // the inner profile
         { x: 2,       y: 0.165 - bitRadius,   z },
@@ -237,11 +206,10 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
         { x: -3,  y: 0.209 - bitRadius,   z },
       ];
     const lineB = [ // the border of the stock
-      { x: -3,  y: -0.165 - bitRadius,   z },
-      { x: 0,  y: -0.165 - bitRadius,   z },
-      { x: 2,  y: -0.165 - bitRadius,   z },
+      { x: -3,  y: -1.5 - bitRadius,   z },
+      { x: 2,  y: -1.5 - bitRadius,   z },
     ]; 
-    passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ, passDirection: 'bottom-to-top'}) });
+    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ, passDirection: 'bottom-to-top'}) });
   }
   //=====================================================================
   // PASS 4 -- TOOTH
