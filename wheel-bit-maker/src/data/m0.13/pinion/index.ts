@@ -188,7 +188,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       { x: -5.0, y: 0.7 + bitRadius, z }
     ]; 
  
-    passes.push({ bit, bitMesh, rotationSteps: 360 / 3, startAngle: 0, endAngle: 360, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
   }
   //=====================================================================
   // PASS 3 - Top flatten relief angles
@@ -232,7 +232,8 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       bitMesh,
       segmentsForThreeJs,
       segmentsForGcodeFitted,
-      originalLines: []
+      originalLines: [],
+      rotationSteps: 45 / 3, startAngle: 90, endAngle: 45
     }); 
   }
   // ------------------- 

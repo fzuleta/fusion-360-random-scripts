@@ -187,7 +187,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       { x: -5.0, y: 0.7 + bitRadius, z: 0 }
     ]; 
  
-    passes.push({ bit, bitMesh, rotationSteps: 45 / 3, startAngle: 90, endAngle: 45, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
   }
   //=====================================================================
   // PASS 3 - Top flatten relief angles
