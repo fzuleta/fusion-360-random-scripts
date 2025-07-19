@@ -276,21 +276,20 @@ export function generateGCodeFromSegments(props: {
   const { bit, segments, rotationSteps = 0, indexAfterPath } = props;
 
   const gcode: string[] = [
-    'G90 G94 G91.1 G40 G49 G17',
-    'G21',
-    'G28 G91 Z0.',
-    'G90',
-  ];
+  'G90 G94 G91.1 G40 G49 G17', // abs, mm/min, IJ inc, cancel comp, XY plane
+  'G21',                       // metric
+  'G28 G91 Z0.',               // retract to machine Z-home
+  'G90',
 
-  gcode.push(...[
-    `T${bit.toolNumber} M6`,
-    `S${bit.spindleSpeed} M3`,
-    `G17 G90 G94`,
-    `G54`,
-    `G0 A0.`,
-    `M8`,
-    `G43 Z16.45 H${bit.toolNumber}`,
-  ]);
+  `( TOOL ${bit.toolNumber}  Ø${bit.diameter.toFixed(3)} CVD-DIA )`,
+  `T${bit.toolNumber} M6`,
+  `S${bit.spindleSpeed} M3`,
+  'G4 P1' ,                   // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
+  'M8',                       // air / coolant on
+  'G54',                      // work offset
+  'G0 A0.',                   // zero the rotary
+  `G43 Z15.0 H${bit.toolNumber}`, // length offset + safe height
+];
 
   const hasRotary   = rotationSteps > 0;
   const angleStep   = hasRotary ? 360 / rotationSteps : 0;
@@ -334,14 +333,14 @@ export function generateGCodeFromSegments(props: {
   }
 
   gcode.push(...[
-    'M9',
-    'M5',
-    'G28 G91 Z0.',
-    'G90',
-    'G0 A0.',
-    'G28 G91 X0. Y0.',
-    'G90',
-    'M30'
-  ])
+    'M9',                      // Coolant off (turns off air or flood)
+    'M5',                      // Spindle stop
+    'G28 G91 Z0.',             // Home Z-axis (machine zero) using relative mode
+    'G90',                     // Restore absolute positioning
+    'G0 A0.',                  // Return rotary axis A to zero position
+    'G28 G91 X0. Y0.',         // Home X and Y axes (machine zero) using relative mode
+    'G90',                     // Ensure we're back in absolute mode
+    'M30'                      // Program end and rewind
+  ]);
   return gcode;
 }
