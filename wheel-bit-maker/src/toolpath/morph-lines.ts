@@ -266,15 +266,32 @@ const densifyLine = (line: PointXYZ[], maxSeg: number): PointXYZ[] => {
  * The caller is expected to create the segments with `planSegmentsFromPasses`.
  */
 export function generateGCodeFromSegments(props: {
+  bit: IBit;
   segments: ToolpathSegment[];
   /** If ≤ 0 or omitted, NO A-axis moves are emitted. */
   rotationSteps?: number;
   /** One-off rotary index after the entire tool-path (deg). */
   indexAfterPath?: number;
 }): string[] {
-  const { segments, rotationSteps = 0, indexAfterPath } = props;
+  const { bit, segments, rotationSteps = 0, indexAfterPath } = props;
 
-  const gcode: string[] = [];
+  const gcode: string[] = [
+    'G90 G94 G91.1 G40 G49 G17',
+    'G21',
+    'G28 G91 Z0.',
+    'G90',
+  ];
+
+  gcode.push(...[
+    `T${bit.toolNumber} M6`,
+    `S${bit.spindleSpeed} M3`,
+    `G17 G90 G94`,
+    `G54`,
+    `G0 A0.`,
+    `M8`,
+    `G43 Z16.45 H${bit.toolNumber}`,
+  ]);
+
   const hasRotary   = rotationSteps > 0;
   const angleStep   = hasRotary ? 360 / rotationSteps : 0;
   let   currentAngle = 0;
@@ -315,5 +332,16 @@ export function generateGCodeFromSegments(props: {
   if (!hasRotary && typeof indexAfterPath === 'number') {
     gcode.push(`G0 A${indexAfterPath.toFixed(3)}`);
   }
+
+  gcode.push(...[
+    'M9',
+    'M5',
+    'G28 G91 Z0.',
+    'G90',
+    'G0 A0.',
+    'G28 G91 X0. Y0.',
+    'G90',
+    'M30'
+  ])
   return gcode;
 }

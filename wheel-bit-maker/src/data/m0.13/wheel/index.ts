@@ -182,8 +182,8 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
         { x: -5.0 + bitRadius, y: 0.2 + 1.32 + bitRadius, z }, // 1.3 is the diameter of the outer disk, I added 0.02 as stock leftover
       ];
     const lineB = [ // the border of the stock
-      { x: 2, y: 0.7 + bitRadius, z }, 
-      { x: -5.0, y: 0.7 + bitRadius, z }
+      { x: 2, y: 0.7 + bitRadius, z: 0 }, 
+      { x: -5.0, y: 0.7 + bitRadius, z: 0 }
     ]; 
  
     passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });

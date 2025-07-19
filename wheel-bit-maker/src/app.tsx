@@ -14,7 +14,7 @@ function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
   const [passNum, setPassNum] = React.useState(0);
   // Feed‑rate in mm/min (20 = very slow, 200 = nominal)
-  const [feedRate, setFeedRate] = React.useState(120);
+  const [feedRate, setFeedRate] = React.useState(152);
   const [stepOver, setStepOver] = React.useState(0.04);
   const [stockRadius] = React.useState(6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
@@ -301,6 +301,7 @@ function App() {
 
     const gcodeLines = generateGCodeFromSegments({
       segments: current.segmentsForGcodeFitted,
+      bit: current.bit,
       rotationSteps: 0,
       indexAfterPath: 1,
     });
@@ -340,7 +341,7 @@ return (
             onChange={(e) => setPassNum(parseInt(e.target.value))}
           >
             {[0, 1, 2, 3, 4].map((_, index) => (
-              <option key={index} value={index}>Pass {index + 1}</option>
+              <option key={index} value={index}>Pass {index}</option>
             ))}
           </select>
         </label>
