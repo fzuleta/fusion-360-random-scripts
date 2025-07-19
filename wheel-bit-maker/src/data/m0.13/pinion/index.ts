@@ -5,7 +5,7 @@ import { createBitMesh, generatePath, generateToothPath } from '../../helpers';
 import * as wheel from '../../../nihs_20_30/wheel';
 
 export const filename = 'm=0.13 z=14.stl';
- 
+
 const bottomCut = -0.6
 
 const _points: Segment[] = [
@@ -54,9 +54,9 @@ const _points: Segment[] = [
     to:   { x: -1,      y: 0,               z: bottomCut - 0.1 },
   },
 ].map(it => {
-  const offsetX = -0.223;
+  const offsetX = -0.209; // half of the tooth width
   const offsetY = 0;
-  const offsetZ = 1.2970;
+  const offsetZ = 1.2970; // this is the height of the tooth from center of wheel to top
   [it.from, it.to, it.center].forEach(k => {
     if (!k) { return; }
     k.x += offsetX;
@@ -103,108 +103,168 @@ export const points: ISegments = {
 
 export const getPasses = (stockRadius: number, stepOver: number, feedRate: number) => {
   const passes: any = [];
-  let bit = bit3_175mm;
-  let bitMesh: THREE.Mesh;
-  let cutZ = -0.5;
-  let bitRadius = bit.diameter * 0.5;
-  const safeX = (bitRadius + (bitRadius*0.1));
-  const safeY = (stockRadius + bitRadius + 2);
-  const z = 0;
   //=====================================================================
-  // PASS 0
-  //===================================================================== 
-  bitMesh = createBitMesh(bit);
-  const lineStart = [
-    { x: safeX, y: safeY, z }, 
-    { x: safeX, y: stockRadius, z }, 
-    { x: 0, y: stockRadius, z }
-  ];
-  let lineA = [
-    { x: 0, y: stockRadius, z }, 
-    { x: -25.6, y: stockRadius, z }
-  ];
-  let lineB =  
-    [
-      { x: 0, y: 1.303, z },
-      { x: -0.45, y: 1.303, z },
-      { x: -0.45, y: 0.7, z },
-      { x: -10, y: 0.7, z },
-      { x: -15.6, y: stockRadius, z }
+  // PASS 0 - Rough shape
+  //=====================================================================
+  {
+    const bit = bit3_175mm;
+    const bitMesh = createBitMesh(bit);
+    const cutZ = -0.5;
+    const z = cutZ;
+    const bitRadius = bit.diameter * 0.5;
+    // console.log('Getting m0.13 Z112')
+    const safeX = (bitRadius + (bitRadius*0.1));
+    const safeY = (stockRadius + bitRadius + 2);
+    const lineStart = [
+      { x: safeX, y: safeY, z: cutZ }, 
+      { x: safeX, y: stockRadius, z: cutZ }, 
+      { x: 0, y: stockRadius, z: cutZ }
+    ];
+    lineStart.forEach(it => it.y += bitRadius);
+
+    const lineA = [ // the border of the stock
+      { x: 0, y: stockRadius, z }, 
+      { x: -25.6, y: stockRadius, z }
+    ];
+    const lineB =  // the inner profile
+      [
+        { x: 0, y: 1.303, z },
+        { x: -0.45, y: 1.303, z },
+        { x: -0.45, y: 0.7, z },
+        { x: -10, y: 0.7, z },
+        { x: -15.6, y: stockRadius, z }
+      ];
+
+    lineA.forEach(it => it.y += bitRadius);
+    const lineB_offset = JSON.parse(JSON.stringify(lineB))
+    let i = 0;
+    i=0;  lineB_offset[i].y += bitRadius;
+    i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
+    i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
+    i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
+    i++;  lineB_offset[i].y += bitRadius;
+    
+    passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  }
+  //=====================================================================
+  // PASS 1 - rough shape more detail
+  //=====================================================================
+  {
+    const bit = bit1mm;
+    const bitMesh = createBitMesh(bit);
+    const bitRadius = bit.diameter * 0.5
+    const cutZ = -0.5;
+    const z = cutZ;
+    const safeX = (bitRadius + (bitRadius*0.1));
+    const safeY = (stockRadius + bitRadius + 2); 
+    const lineStart = [
+      { x: safeX, y: safeY, z }, 
+      { x: safeX, y: stockRadius, z }, 
+      { x: 0, y: stockRadius, z }
+    ];
+    const lineA = [ // the border of the stock
+      { x: 0, y: 1.5, z }, 
+      { x: -3.0, y: 1.5, z }
+    ];
+    const lineB =  // the inner profile
+      [
+        { x: 0, y: 1.298, z },
+        { x: -0.45, y: 1.298, z },
+        { x: -0.45, y: 0.7, z },
+        { x: -3, y: 0.7, z }, 
+      ];
+    lineA.forEach(it => it.y += bitRadius);
+    const lineB_offset = JSON.parse(JSON.stringify(lineB));
+
+    let i = 0;
+    i=0;  lineB_offset[i].y += bitRadius;
+    i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
+    i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
+    i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
+    passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stepOver, stockRadius, bit, feedRate, cutZ}) });
+  }
+  //=====================================================================
+  // PASS 2 - side flatten
+  //=====================================================================
+  {
+    const bit = bit3_175mm;
+    const bitMesh = createBitMesh(bit);
+    const bitRadius = bit.diameter * 0.5
+    const cutZ= 0;
+    const z = cutZ;
+
+    const safeX = (bitRadius + (bitRadius*0.1));
+    const safeY = (stockRadius + bitRadius + 2); 
+    const lineStart = [
+      { x: safeX, y: safeY, z }, 
+      { x: safeX, y: stockRadius, z }, 
+      { x: 0, y: stockRadius, z }
     ];
 
-  lineA.forEach(it => it.y += bitRadius);
-  let lineB_offset = JSON.parse(JSON.stringify(lineB))
-  let i: number;
-  i=0;  lineB_offset[i].y += bitRadius;
-  i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
-  i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
-  i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
-  i++;  lineB_offset[i].y += bitRadius;
-  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    const lineA =  // the inner profile
+      [
+        { x: 2 + bitRadius, y: 0.638 + 1.3 + bitRadius, z },
+        { x: -5.0 + bitRadius, y: 0.638 + 1.3 + bitRadius, z },
+      ];
+    const lineB = [ // the border of the stock
+      { x: 2, y: 0.638 + bitRadius, z }, 
+      { x: -5.0, y: 0.638 + bitRadius, z }
+    ]; 
+ 
+    passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
+  }
   //=====================================================================
-  // PASS 1
+  // PASS 3 - Top flatten relief angles
   //=====================================================================
-  bit = bit1mm;
-  bitMesh = createBitMesh(bit);
-  bitRadius = bit.diameter * 0.5
-  lineA = [ // the border of the stock
-    { x: 0, y: 1.5, z }, 
-    { x: -3.0, y: 1.5, z }
-  ];
-  lineB =  // the inner profile
-    [
-      { x: 0, y: 1.298, z },
-      { x: -0.45, y: 1.298, z },
-      { x: -0.45, y: 0.7, z },
-      { x: -3, y: 0.7, z }, 
+  {
+    const bit = bit3_175mm;
+    const bitMesh = createBitMesh(bit);
+    const bitRadius = bit.diameter * 0.5
+    const cutZ= 0.68;
+    const z = cutZ;
+
+    const safeX = (bitRadius + (bitRadius*0.1));
+    const safeY = (- bitRadius - 2); 
+    const lineStart = [
+      { x: safeX, y: safeY, z },
+      { x: safeX + 1, y: safeY, z },
     ];
-  lineA.forEach(it => it.y += bitRadius);
-  lineB_offset = JSON.parse(JSON.stringify(lineB));
 
-  i=0;  lineB_offset[i].y += bitRadius;
-  i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
-  i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
-  i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
-  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    const lineA = [ // the inner profile
+        { x: 2,       y: 0.165 - bitRadius,   z },
+        { x: 0,       y: 0.165 - bitRadius,   z },
+        { x: -0.418,  y: 0.209 - bitRadius,   z }, // 6 deg relief
+        // { x: -0.418,  y: 0.165 - bitRadius,   z }, // 6 deg relief
+        { x: -3,  y: 0.209 - bitRadius,   z },
+      ];
+    const lineB = [ // the border of the stock
+      { x: -3,  y: -0.165 - bitRadius,   z },
+      { x: 0,  y: -0.165 - bitRadius,   z },
+      { x: 2,  y: -0.165 - bitRadius,   z },
+    ]; 
+    passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ, passDirection: 'bottom-to-top'}) });
+  }
   //=====================================================================
-  // PASS 2
+  // PASS 4 -- TOOTH
   //=====================================================================
-  bit = bit3_175mm;
-  bitMesh = createBitMesh(bit);
-  bitRadius = bit.diameter * 0.5
-  cutZ= 0;
-  lineA =  // the inner profile
-    [
-      { x: 2 + bitRadius, y: 0.638 + 1.3 + bitRadius, z },
-      { x: -5.0 + bitRadius, y: 0.638 + 1.3 + bitRadius, z },
-    ];
-  lineB = [ // the border of the stock
-    { x: 2, y: 0.638 + bitRadius, z }, 
-    { x: -5.0, y: 0.638 + bitRadius, z }
-  ];
-  lineB_offset = JSON.parse(JSON.stringify(lineB)); 
+  {
+    // Re‑use wheel.getMesh just to obtain the raster TVector3[] path
+    const bit = bit3_175mm;
+    const bitMesh = createBitMesh(bit);
+    const { path } = wheel.getMesh(points, stepOver, bitMesh);
 
-  // i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius; 
-  passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
-  
-  //=====================================================================
-  // PASS 3 -- TOOTH
-  //=====================================================================
-  bit = bit3_175mm;
-  bitMesh = createBitMesh(bit);
-  const { path } = wheel.getMesh(points, stepOver, bitMesh);
+    const {
+      segmentsForThreeJs,
+      segmentsForGcodeFitted,
+    } = generateToothPath(path);
 
-  const {
-    segmentsForThreeJs,
-    segmentsForGcodeFitted,
-  } = generateToothPath(path);
-
-  passes.push({
-    bit: bit3_175mm,
-    bitMesh,
-    segmentsForThreeJs,
-    segmentsForGcodeFitted,
-  }); 
-  
+    passes.push({
+      bit: bit3_175mm,
+      bitMesh,
+      segmentsForThreeJs,
+      segmentsForGcodeFitted,
+    }); 
+  }
+  // ------------------- 
   return passes;
 }

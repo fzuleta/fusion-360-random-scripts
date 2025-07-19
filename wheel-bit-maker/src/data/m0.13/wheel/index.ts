@@ -230,16 +230,16 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     ];
 
     const lineA = [ // the inner profile
-        { x: 3,       y: 0.165 - bitRadius,   z },
+        { x: 2,       y: 0.165 - bitRadius,   z },
         { x: 0,       y: 0.165 - bitRadius,   z },
         { x: -0.418,  y: 0.209 - bitRadius,   z }, // 6 deg relief
         // { x: -0.418,  y: 0.165 - bitRadius,   z }, // 6 deg relief
-        { x: -5,  y: 0.209 - bitRadius,   z },
+        { x: -3,  y: 0.209 - bitRadius,   z },
       ];
     const lineB = [ // the border of the stock
-      { x: -5,  y: -0.165 - bitRadius,   z },
+      { x: -3,  y: -0.165 - bitRadius,   z },
       { x: 0,  y: -0.165 - bitRadius,   z },
-      { x: 3,  y: -0.165 - bitRadius,   z },
+      { x: 2,  y: -0.165 - bitRadius,   z },
     ]; 
     passes.push({ bit, bitMesh, ...generatePath({lineStart, lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ, passDirection: 'bottom-to-top'}) });
   }
