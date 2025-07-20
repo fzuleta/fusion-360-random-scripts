@@ -33,6 +33,8 @@ function App() {
   const pathRef = React.useRef<TVector3[]>([]);
   // Shared progress for animBit <–> scrub slider
   const wheelStateRef = React.useRef<{ i: number; t: number }>({ i: 0, t: 0 });
+  // Animation pause state
+  const isAnimationPausedRef = React.useRef(false);
 
   const draw = () => {
     if (!sceneRef.current) return; 
@@ -55,9 +57,9 @@ function App() {
 
       const other = otherThingsToRender;
       other['tooth'] = () => {
-        if (isScrubbingRef.current) return;   // freeze while slider is held
+        if (isScrubbingRef.current || isAnimationPausedRef.current) return;   // freeze while slider is held or animation is paused
         // elapsed time
-        const dt = clock.getDelta();
+        const dt = Math.min(clock.getDelta(), 0.1); // cap to 100ms
 
         // ── Skip any zero‑length segments (duplicate points) ────────────
         const n = path.length;
@@ -111,7 +113,7 @@ function App() {
 
     if (pass.segmentsForThreeJs && pass.segmentsForThreeJs.length) {
       const path: TVector3[] = pass.segmentsForThreeJs;
-      pathRef.current = path;            // ← expose to slider
+      pathRef.current = path;
 
       // build geometry
       const geo = new THREE.BufferGeometry().setFromPoints(path);
@@ -141,38 +143,108 @@ function App() {
       const line = new THREE.Line(geo, mat);
       toolpathGroupRef.current.add(line);
 
-      if (pass.rotation ) {
-        const radius = 3; // distance from X-axis 
-        const angleStep = (pass.rotation.endAngle - pass.rotation.startAngle) / pass.rotation.steps;
-        const circlePoints: THREE.Vector3[] = [];
-
-        for (let i = 0; i <= pass.rotation.steps; i++) {
-          const angleDeg = pass.rotation.startAngle + i * angleStep;
-          const angleRad = degToRad(angleDeg);
-          const y = radius * Math.cos(angleRad);
-          const z = radius * Math.sin(angleRad);
-          circlePoints.push(new THREE.Vector3(0, y, z)); // X is constant
-        }
-
-        const circleGeometry = new THREE.BufferGeometry().setFromPoints(circlePoints);
-        const circleMaterial = new THREE.LineBasicMaterial({ color: 0x6666ff });
-        const circleLine = new THREE.Line(circleGeometry, circleMaterial);
-        toolpathGroupRef.current.add(circleLine);
-
-        // Add small spheres at each rotation step
-        const sphereGeometry = new THREE.SphereGeometry(0.05, 8, 8);
-        const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x9999ff });
-        for (const pt of circlePoints) {
-          const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-          sphere.position.copy(pt);
-          toolpathGroupRef.current.add(sphere);
-        }
-      }
+      drawRotaryVisual(pass.originalLines, pass.rotation);
 
       animBit(path);
       return;
     }
   } 
+  const drawRotaryVisual = (originalLines: PointXYZ[][], rotation?: NonNullable<IPass["rotation"]>) => {
+    if (!rotation) { return; }
+    const segments: TVector3[] = [];
+
+    // Build rotarySegments from the first two original lines
+    const lines0 = originalLines?.[0] ?? [];
+    const lines1 = originalLines?.[1] ?? [];
+
+    for (let i = 0; i < lines0.length - 1; i++) {
+      const a = lines0[i];
+      const b = lines0[i + 1];
+      segments.push(new THREE.Vector3(a.x, a.y, a.z ?? 0));
+      segments.push(new THREE.Vector3(b.x, b.y, b.z ?? 0));
+    }
+    for (let i = 0; i < lines1.length - 1; i++) {
+      const a = lines1[i];
+      const b = lines1[i + 1];
+      segments.push(new THREE.Vector3(a.x, a.y, a.z ?? 0));
+      segments.push(new THREE.Vector3(b.x, b.y, b.z ?? 0));
+    }
+    // Connect lines1 last to lines0 first
+    if (lines1.length && lines0.length) {
+      const a = lines1[lines1.length - 1];
+      const b = lines0[0];
+      segments.push(new THREE.Vector3(a.x, a.y, a.z ?? 0));
+      segments.push(new THREE.Vector3(b.x, b.y, b.z ?? 0));
+    }
+
+    switch (rotation.mode) {
+      case 'fullPassPerRotation':
+        return drawFullPassPerRotation(segments, rotation);
+      case 'onePassPerRotation':
+        return drawOnePassPerRotation(segments, rotation);
+      case 'repeatPassOverRotation':
+        return drawRepeatPassOverRotation(segments, rotation);
+      default:
+        console.warn("Unknown rotation mode:", rotation.mode);
+    }
+  };
+  const drawFullPassPerRotation = (segments: TVector3[], rotation: IPass["rotation"]) => {
+    if (!rotation) { return; }
+    const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
+    for (let i = 0; i < rotation.steps; i++) {
+      const angle = degToRad(rotation.startAngle + i * angleStep);
+      const pts = segments.map(p => p.clone().applyAxisAngle(new THREE.Vector3(1, 0, 0), angle));
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: 0xff9900, transparent: true, opacity: 0.5 });
+      toolpathGroupRef.current?.add(new THREE.Line(geo, mat));
+    }
+  };
+
+  const drawOnePassPerRotation = (segments: TVector3[], rotation: IPass["rotation"]) => {
+    if (!rotation) { return; }
+    const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
+    const passes: TVector3[][] = [];
+    let buf: TVector3[] = [];
+    segments.forEach(p => {
+      buf.push(p);
+      if (p.isRetract) {
+        passes.push(buf);
+        buf = [];
+      }
+    });
+    if (buf.length) passes.push(buf);
+    for (let i = 0; i < passes.length; i++) {
+      const angle = degToRad(rotation.startAngle + i * angleStep);
+      const pts = passes[i].map(p => p.clone().applyAxisAngle(new THREE.Vector3(1, 0, 0), angle));
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: 0x33ccff, transparent: true, opacity: 0.7 });
+      toolpathGroupRef.current?.add(new THREE.Line(geo, mat));
+    }
+  };
+
+  const drawRepeatPassOverRotation = (segments: TVector3[], rotation: IPass["rotation"]) => {
+    if (!rotation) { return; }
+    const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
+    const passes: TVector3[][] = [];
+    let buf: TVector3[] = [];
+    segments.forEach(p => {
+      buf.push(p);
+      if (p.isRetract) {
+        passes.push(buf);
+        buf = [];
+      }
+    });
+    if (buf.length) passes.push(buf);
+    passes.forEach(pass => {
+      for (let i = 0; i < rotation.steps; i++) {
+        const angle = degToRad(rotation.startAngle + i * angleStep);
+        const pts = pass.map(p => p.clone().applyAxisAngle(new THREE.Vector3(1, 0, 0), angle));
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        const mat = new THREE.LineBasicMaterial({ color: 0x66ff66, transparent: true, opacity: 0.3 });
+        toolpathGroupRef.current?.add(new THREE.Line(geo, mat));
+      }
+    });
+  };
   const loadMesh = () => {
     if (!pass) { return; }
     // after you create sceneRef.current, camera, renderer, etc.
@@ -409,6 +481,11 @@ return (
         </label>
         <button style={{ marginLeft: 8 }} onClick={handleDownloadGcode}>
           ⬇︎&nbsp;Download&nbsp;G‑code
+        </button>
+        <button style={{ marginLeft: 8 }} onClick={() => {
+          isAnimationPausedRef.current = !isAnimationPausedRef.current;
+        }}>
+          {isAnimationPausedRef.current ? '▶︎ Resume' : '❚❚ Pause'}
         </button>
       </div>
       {/* full‑width scrub slider on its own line */}

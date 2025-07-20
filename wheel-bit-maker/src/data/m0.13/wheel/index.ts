@@ -140,7 +140,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       bitMesh, 
       rotation: {
         mode: 'repeatPassOverRotation',
-        steps: 360 / 3, 
+        steps: 360 / 5, // every 5 degrees
         startAngle: 0, 
         endAngle: 360
       }, 
@@ -189,7 +189,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       bitMesh, 
       rotation: {
         mode: 'repeatPassOverRotation',
-        steps: 360 / 3, 
+        steps: 360 / 5,  // every 5 degrees
         startAngle: 0, 
         endAngle: 360
       }, 
