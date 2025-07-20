@@ -141,13 +141,13 @@ function App() {
       const line = new THREE.Line(geo, mat);
       toolpathGroupRef.current.add(line);
 
-      if (pass.startAngle !== undefined && pass.endAngle !== undefined && pass.rotationSteps !== undefined) {
+      if (pass.rotation ) {
         const radius = 3; // distance from X-axis 
-        const angleStep = (pass.endAngle - pass.startAngle) / pass.rotationSteps;
+        const angleStep = (pass.rotation.endAngle - pass.rotation.startAngle) / pass.rotation.steps;
         const circlePoints: THREE.Vector3[] = [];
 
-        for (let i = 0; i <= pass.rotationSteps; i++) {
-          const angleDeg = pass.startAngle + i * angleStep;
+        for (let i = 0; i <= pass.rotation.steps; i++) {
+          const angleDeg = pass.rotation.startAngle + i * angleStep;
           const angleRad = degToRad(angleDeg);
           const y = radius * Math.cos(angleRad);
           const z = radius * Math.sin(angleRad);
@@ -331,10 +331,7 @@ function App() {
     const gcodeLines = generateGCodeFromSegments({
       segments: current.segmentsForGcodeFitted,
       bit: current.bit,
-      rotationSteps: pass.rotationSteps,
-      startAngle: pass.startAngle,
-      endAngle: pass.endAngle,
-      indexAfterPath: 1,
+      rotation: pass.rotation,
     });
 
     const blob = new Blob([gcodeLines.join('\n')], { type: 'text/plain' });

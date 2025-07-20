@@ -136,7 +136,25 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].y += bitRadius;
     
-    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB: lineB_offset, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    passes.push({ 
+      bit, 
+      bitMesh, 
+      rotation: {
+        mode: 'repeatPassOverRotation',
+        steps: 360 / 3, 
+        startAngle: 0, 
+        endAngle: 360
+      }, 
+      ...generatePath({ 
+        lineA, 
+        lineB: lineB_offset, 
+        stockRadius, 
+        stepOver, 
+        bit, 
+        feedRate, 
+        cutZ,
+      }), 
+    });
   }
   //=====================================================================
   // PASS 1 - rough shape more detail
@@ -166,7 +184,26 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
-    passes.push({ bit, bitMesh, rotationSteps: 360 / 3, startAngle: 0, endAngle: 360, ...generatePath({ lineA, lineB: lineB_offset, stepOver, stockRadius, bit, feedRate, cutZ}) });
+
+    passes.push({ 
+      bit, 
+      bitMesh, 
+      rotation: {
+        mode: 'repeatPassOverRotation',
+        steps: 360 / 3, 
+        startAngle: 0, 
+        endAngle: 360
+      }, 
+      ...generatePath({ 
+        lineA, 
+        lineB: lineB_offset, 
+        stepOver, 
+        stockRadius, 
+        bit, 
+        feedRate, 
+        cutZ
+      }),
+    });
   }
   //=====================================================================
   // PASS 2 - Side flatten
@@ -188,7 +225,19 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       { x: -5.0, y: 0.7 + bitRadius, z }
     ]; 
  
-    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ}) });
+    passes.push({ 
+      bit, 
+      bitMesh, 
+      ...generatePath({ 
+        lineA, 
+        lineB, 
+        stockRadius, 
+        stepOver, 
+        bit, 
+        feedRate, 
+        cutZ,
+      }),
+    });
   }
   //=====================================================================
   // PASS 3 - Top flatten relief angles
@@ -210,8 +259,21 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     const lineB = [ // the border of the stock
       { x: -3,  y: -1.5 - bitRadius,   z },
       { x: 2,  y: -1.5 - bitRadius,   z },
-    ]; 
-    passes.push({ bit, bitMesh, ...generatePath({ lineA, lineB, stockRadius, stepOver, bit, feedRate, cutZ, passDirection: 'bottom-to-top'}) });
+    ];
+    passes.push({ 
+      bit, 
+      bitMesh, 
+      ...generatePath({ 
+        lineA, 
+        lineB, 
+        stockRadius, 
+        stepOver, 
+        bit, 
+        feedRate, 
+        cutZ, 
+        passDirection: 'bottom-to-top'
+      }),
+    });
   }
   //=====================================================================
   // PASS 4 -- TOOTH
@@ -233,7 +295,12 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       segmentsForThreeJs,
       segmentsForGcodeFitted,
       originalLines: [],
-      rotationSteps: 45 / 3, startAngle: 90, endAngle: 45
+      rotation: {
+        mode: 'repeatPassOverRotation',
+        steps: 45 / 3, 
+        startAngle: 90, 
+        endAngle: 45,
+      }
     }); 
   }
   // ------------------- 

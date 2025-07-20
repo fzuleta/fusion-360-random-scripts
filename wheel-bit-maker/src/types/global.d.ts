@@ -39,3 +39,10 @@ declare type ITeethPoint =  {from: PointXYZ, to: PointXYZ, center?: PointXYZ & {
 declare type IBit = {diameter: number, height: number, toolNumber: number, spindleSpeed: number }
 
 declare type TVector3 = THREE.Vector3 & {isRetract?: boolean; isCut?: boolean }
+
+
+declare type TRotationMode =
+  | 'noRotation'              // fallback/default
+  | 'fullPassPerRotation'     // Do the entire path, then rotate. Repeat.
+  | 'onePassPerRotation'      // Each pass (cut-retract group) is done once per rotation step.
+  | 'repeatPassOverRotation'; // Each pass is repeated at every rotary step before moving to next.
