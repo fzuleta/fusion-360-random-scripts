@@ -154,7 +154,7 @@ function App() {
     const segments: TVector3[] = [];
 
     // Build rotarySegments from the first two original lines
-    const lines0 = originalLines?.[0] ?? [];
+    // const lines0 = originalLines?.[0] ?? [];
     const lines1 = originalLines?.[1] ?? [];
 
     // for (let i = 0; i < lines0.length - 1; i++) {

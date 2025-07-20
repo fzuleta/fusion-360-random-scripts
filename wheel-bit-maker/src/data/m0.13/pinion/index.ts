@@ -141,7 +141,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       bitMesh, 
       rotation: {
         mode: 'repeatPassOverRotation',
-        steps: 360 / 3, 
+        steps: 360 / 8, // every 5 degrees
         startAngle: 0, 
         endAngle: 360
       }, 
@@ -190,7 +190,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       bitMesh, 
       rotation: {
         mode: 'repeatPassOverRotation',
-        steps: 360 / 3, 
+        steps: 360 / 8,  // every 5 degrees
         startAngle: 0, 
         endAngle: 360
       }, 
@@ -228,6 +228,12 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     passes.push({ 
       bit, 
       bitMesh, 
+      rotation: {
+        mode: 'repeatPassOverRotation',
+        steps: 90 / 10,  // every 5 degrees
+        startAngle: 0, 
+        endAngle: -230
+      }, 
       ...generatePath({ 
         lineA, 
         lineB, 
@@ -294,12 +300,12 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       bitMesh,
       segmentsForThreeJs,
       segmentsForGcodeFitted,
-      originalLines: [],
+      originalLines: [[], path],
       rotation: {
         mode: 'repeatPassOverRotation',
         steps: 45 / 3, 
-        startAngle: 90, 
-        endAngle: 45,
+        startAngle: 0, 
+        endAngle: -45,
       }
     }); 
   }
