@@ -157,22 +157,15 @@ function App() {
     const lines0 = originalLines?.[0] ?? [];
     const lines1 = originalLines?.[1] ?? [];
 
-    for (let i = 0; i < lines0.length - 1; i++) {
-      const a = lines0[i];
-      const b = lines0[i + 1];
-      segments.push(new THREE.Vector3(a.x, a.y, a.z ?? 0));
-      segments.push(new THREE.Vector3(b.x, b.y, b.z ?? 0));
-    }
+    // for (let i = 0; i < lines0.length - 1; i++) {
+    //   const a = lines0[i];
+    //   const b = lines0[i + 1];
+    //   segments.push(new THREE.Vector3(a.x, a.y, a.z ?? 0));
+    //   segments.push(new THREE.Vector3(b.x, b.y, b.z ?? 0));
+    // }
     for (let i = 0; i < lines1.length - 1; i++) {
       const a = lines1[i];
       const b = lines1[i + 1];
-      segments.push(new THREE.Vector3(a.x, a.y, a.z ?? 0));
-      segments.push(new THREE.Vector3(b.x, b.y, b.z ?? 0));
-    }
-    // Connect lines1 last to lines0 first
-    if (lines1.length && lines0.length) {
-      const a = lines1[lines1.length - 1];
-      const b = lines0[0];
       segments.push(new THREE.Vector3(a.x, a.y, a.z ?? 0));
       segments.push(new THREE.Vector3(b.x, b.y, b.z ?? 0));
     }
@@ -345,8 +338,8 @@ function App() {
     controls.enablePan = true
     controls.zoomToCursor = true;
     controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE
-    controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN
-    controls.mouseButtons.RIGHT = THREE.MOUSE.DOLLY
+    controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY
+    controls.mouseButtons.RIGHT = THREE.MOUSE.PAN
     controls.target.x = -5;   // slide view ~20 mm left
     controls.update();
 

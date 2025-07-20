@@ -293,12 +293,12 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       bitMesh,
       segmentsForThreeJs,
       segmentsForGcodeFitted,
-      originalLines: [],
+      originalLines: [[], path],
       rotation: {
         mode: 'repeatPassOverRotation',
         steps: 45 / 3, 
-        startAngle: 90, 
-        endAngle: 45,
+        startAngle: 0, 
+        endAngle: -45,
       }
     }); 
   }
