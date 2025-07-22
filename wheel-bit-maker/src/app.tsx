@@ -174,7 +174,7 @@ function App() {
     const lineTop = new THREE.LineLoop(geoTop, mat);
     const lineBottom = new THREE.LineLoop(geoBottom, mat);
 
-    const topToBottomLines = pointsTop.map((pt, i) => {
+    const topToBottomLines = pointsTop.map((pt, _) => {
       return new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(0, pt.y, pt.z),
