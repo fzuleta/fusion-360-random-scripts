@@ -61,3 +61,27 @@
   padding-left: 4px;
   border-radius: 3px;
 }
+
+.accordion {
+  margin-bottom: 1rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background-color: #181818;
+  color: white;
+  overflow: hidden;
+}
+
+.summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-weight: bold;
+  background-color: #222;
+  user-select: none;
+}
+
+.accordionContent {
+  padding: 12px;
+  font-size: 0.9em;
+  color: #ccc;
+  border-top: 1px solid #333;
+}

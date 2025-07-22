@@ -286,7 +286,7 @@ export function generateGCodeFromSegments(props: {
   `( TOOL ${bit.toolNumber}  Ø${bit.diameter.toFixed(3)} CVD-DIA )`,
   `T${bit.toolNumber} M6`,
   `S${bit.spindleSpeed} M3`,
-  'G4 P1' ,                   // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
+  'G04 P1.0' ,                // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
   'M8',                       // air / coolant on
   'G54',                      // work offset
   `G43 Z15.0 H${bit.toolNumber}`, // length offset + safe height

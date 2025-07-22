@@ -15,8 +15,8 @@ function App() {
   const [passNum, setPassNum] = React.useState(0);
   // Feed‑rate in mm/min (20 = very slow, 200 = nominal)
   const [feedRate, setFeedRate] = React.useState(152);
-  const [stepOver, setStepOver] = React.useState(0.04);
-  const [stockRadius] = React.useState(6 / 2);
+  const [stepOver, setStepOver] = React.useState(0.4);
+  const [stockRadius] = React.useState(((3/8) * 25.4) / 2); // 6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IPass | undefined>(undefined);
   // const [lines, setLines] = React.useState<ILinesGotten>();
@@ -47,7 +47,7 @@ function App() {
     if (!pass) { return; }
 
     loadMesh();
-
+    loadStock();
     const animBit = (path: TVector3[]) => {
       // reset & alias shared state for this new path
       wheelStateRef.current.i = 0;
@@ -148,7 +148,46 @@ function App() {
       animBit(path);
       return;
     }
-  } 
+  }
+  function loadStock() {
+    if (!toolpathGroupRef.current) return;
+
+    const height = 60; // set this to your actual stock length
+    const segments = 64;
+    const pointsTop: THREE.Vector3[] = [];
+    const pointsBottom: THREE.Vector3[] = [];
+
+    for (let i = 0; i <= segments; i++) {
+      const theta = (i / segments) * Math.PI * 2;
+      const z = Math.cos(theta) * stockRadius;
+      const y = Math.sin(theta) * stockRadius;
+      pointsTop.push(new THREE.Vector3(0, y, z));
+      pointsBottom.push(new THREE.Vector3(-height, y, z)); // extend in -X
+    }
+    const mat = new THREE.LineBasicMaterial({
+      color: 0x888888,
+      transparent: true,
+      opacity: 0.2,
+    });
+    const geoTop = new THREE.BufferGeometry().setFromPoints(pointsTop);
+    const geoBottom = new THREE.BufferGeometry().setFromPoints(pointsBottom);
+    const lineTop = new THREE.LineLoop(geoTop, mat);
+    const lineBottom = new THREE.LineLoop(geoBottom, mat);
+
+    const topToBottomLines = pointsTop.map((pt, i) => {
+      return new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, pt.y, pt.z),
+          new THREE.Vector3(-height, pt.y, pt.z)
+        ]),
+        mat
+      );
+    });
+
+    toolpathGroupRef.current.add(lineTop);
+    toolpathGroupRef.current.add(lineBottom);
+    topToBottomLines.forEach(l => toolpathGroupRef.current!.add(l));
+  }
   const drawRotaryVisual = (originalLines: PointXYZ[][], rotation?: NonNullable<IPass["rotation"]>) => {
     if (!rotation) { return; }
     const segments: TVector3[] = [];
