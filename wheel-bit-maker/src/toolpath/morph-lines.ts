@@ -278,19 +278,26 @@ export function generateGCodeFromSegments(props: {
 }): string[] {
   const { bit, segments, rotation } = props;
   const gcode: string[] = [
-  'G90 G94 G91.1 G40 G49 G17', // abs, mm/min, IJ inc, cancel comp, XY plane
-  'G21',                       // metric
-  'G28 G91 Z0.',               // retract to machine Z-home
-  'G90',
+    'G90 G94 G91.1 G40 G49 G17', // abs, mm/min, IJ inc, cancel comp, XY plane
+    'G21',                       // metric
+    'G28 G91 Z0.',               // retract to machine Z-home
+    'G90',
 
-  `( TOOL ${bit.toolNumber}  Ø${bit.diameter.toFixed(3)} CVD-DIA )`,
-  `T${bit.toolNumber} M6`,
-  `S${bit.spindleSpeed} M3`,
-  'G04 P1.0' ,                // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
-  'M8',                       // air / coolant on
-  'G54',                      // work offset
-  `G43 Z15.0 H${bit.toolNumber}`, // length offset + safe height
-];
+    `( TOOL ${bit.toolNumber}  Ø${bit.diameter.toFixed(3)} CVD-DIA )`,
+    `T${bit.toolNumber} M6`,
+    `S${bit.spindleSpeed} M3`,
+    'G04 P1.0' ,                // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
+    'M8',                       // air / coolant on
+    'G54',                      // work offset
+    `G43 Z30.0 H${bit.toolNumber}`, // length offset + safe height
+  ];
+
+  // Safe XY move before Z descent
+  const firstRetract = segments.find(s => s.kind === 'retract' && s.pts.length > 0);
+  if (firstRetract) {
+    const pt = firstRetract.pts[0];
+    gcode.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} ; pre-position XY at safe Z (retract)`);
+  }
 
   const hasRotary   = !!rotation;
   const aStart = rotation?.startAngle ?? 0;
