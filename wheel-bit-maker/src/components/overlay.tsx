@@ -67,7 +67,7 @@ const Segments = (props: IProps) => {
 
   }, [start, end, props.toolpathGroupRef ]);
 return segments.length === 0 ? <></> : (
-  <details className={styles.accordion} open>
+  <details className={styles.accordion}>
     <summary className={styles.summary}>📍 Segment Points</summary>
     <div className={styles.accordionContent}>
          
