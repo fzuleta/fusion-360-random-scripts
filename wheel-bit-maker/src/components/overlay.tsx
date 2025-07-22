@@ -158,33 +158,32 @@ const Rotation=(props: IProps) => {
    return <details className={styles.accordion} open>
     <summary className={styles.summary}>🌀 Rotation Info</summary>
     <div className={styles.accordionContent}>  
- 
-    <>
-      {/* New Rotation Summary Section */}
-      {props.pass?.rotation && (
-        <div style={{ marginBottom: '1rem', fontSize: '0.9em', color: '#aaa' }}>
-          <strong>Rotation Strategy:</strong>{' '}
+  
+      {/* New Rotation Summary Section */} 
+    <div style={{ marginBottom: '1rem', fontSize: '0.9em', color: '#aaa' }}>
+      <strong>Rotation Strategy:</strong>{' '}
 
-          {props.pass.rotation.mode === 'noRotation' && 'fallback/default'}
-          {props.pass.rotation.mode === 'fullPassPerRotation' && 'Do the entire path, then rotate. Repeat.'}
-          {props.pass.rotation.mode === 'onePassPerRotation' && 'Each pass (cut-retract group) is done once per rotation step.'}
-          {props.pass.rotation.mode === 'repeatPassOverRotation' && 'Each pass is repeated at every rotary step before moving to next.'}
+      {!props.pass?.rotation && <>No Rotation</>}
+      {props.pass?.rotation && <>
+        {props.pass.rotation?.mode === 'noRotation' && 'fallback/default'}
+        {props.pass.rotation?.mode === 'fullPassPerRotation' && 'Do the entire path, then rotate. Repeat.'}
+        {props.pass.rotation?.mode === 'onePassPerRotation' && 'Each pass (cut-retract group) is done once per rotation step.'}
+        {props.pass.rotation?.mode === 'repeatPassOverRotation' && 'Each pass is repeated at every rotary step before moving to next.'}
 
-          <br />
-          <strong>Steps:</strong> {props.pass.rotation.steps}
-          <br />
-          <strong>Angle Range:</strong> {props.pass.rotation.startAngle}° to {props.pass.rotation.endAngle}°
-          {props.pass.rotation.angleAfterCompleted !== undefined && (
-            <>
-              <br />
-              <strong>Angle After Completion:</strong> {props.pass.rotation.angleAfterCompleted}°
-            </>
-          )}
-        </div>
-      )}
+        <br />
+        <strong>Steps:</strong> {props.pass.rotation.steps}
+        <br />
+        <strong>Angle Range:</strong> {props.pass.rotation.startAngle}° to {props.pass.rotation.endAngle}°
+        {props.pass.rotation.angleAfterCompleted !== undefined && (
+          <>
+            <br />
+            <strong>Angle After Completion:</strong> {props.pass.rotation.angleAfterCompleted}°
+          </>
+        )}
+      </>}
+    </div> 
 
       {/* Your input sections (start and end points) go here */}
-    </> 
     </div>
   </details> 
 }

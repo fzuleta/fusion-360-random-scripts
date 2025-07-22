@@ -442,7 +442,7 @@ function App() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url;
-    a.download = 'pass.nc';
+    a.download = `pass-${passNum}.nc`;
     a.click();
     URL.revokeObjectURL(url);
   };
