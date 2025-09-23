@@ -4,11 +4,12 @@ import * as model_0_13_z14 from './m0.13/pinion';
 import type { ToolpathSegment } from '../toolpath/morph-lines';
 
 export type IPass = {
+  name: string;
   bit: IBit, 
   bitMesh: THREE.Mesh
   originalLines: PointXYZ[][], 
   segmentsForThreeJs: TVector3[][],
-  segmentsForGcodeFitted  : ToolpathSegment[];
+  segmentsForGcodeFitted  : ToolpathSegment[]; 
   rotation?: {
     mode: TRotationMode;
     steps: number;
@@ -21,7 +22,7 @@ export type IPass = {
 interface IModel {
   filename: string;
   getPasses: (stockRadius: number, stepOver: number, feedRate: number) => IPass[];
-  points: ISegments;
+  // points: ISegments;
 }
 export const models: {[key: string]: IModel} = {
   "model_0_13_Z112": model_0_13_Z112,

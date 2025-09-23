@@ -17,6 +17,27 @@ export function isNumeric(str: any) {
   return regx.test(str);
 }
 
+// Returns an array like: [0,1,2,3,4,5] when range(6)
+export function range(a: number, b?: number|undefined, step?: number|undefined): number[] {
+  if (b === undefined && step === undefined) {
+    b = a;
+    a = 0;
+  }
+  b = b || 0;
+  step = step || 1;
+
+  if (b < a) {
+    return range(b + 1, a + 1, step).reverse();
+  }
+
+  let x: number; const r: number[] = [];
+
+  for (x = a; (b - x) * step > 0; x += step) {
+    r.push(x);
+  }
+  return r;
+
+}
 export const cloneSegment = ((p: Segment): Segment => {
   return {
     type: p.type,

@@ -14,11 +14,12 @@ function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
   const [passNum, setPassNum] = React.useState(0);
   // Feed‑rate in mm/min (20 = very slow, 200 = nominal)
-  const [feedRate, setFeedRate] = React.useState(152);
-  const [stepOver, setStepOver] = React.useState(0.4);
+  const [feedRate, setFeedRate] = React.useState(2000);
+  const [stepOver, setStepOver] = React.useState(0.2);
   const [stockRadius] = React.useState(((3/8) * 25.4) / 2); // 6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IPass | undefined>(undefined);
+  const [passes, setPasses] = React.useState<IPass[]>([]);
   // const [lines, setLines] = React.useState<ILinesGotten>();
   const feedRateRef = React.useRef(120);
   const bitMeshRef = React.useRef<THREE.Mesh>(null);
@@ -327,7 +328,9 @@ function App() {
   React.useEffect(() => {
     if (!modelBit) { return; }
     console.log("Changing stepOver to: ", stepOver);
-    setPass(modelBit.getPasses(stockRadius, stepOver, feedRate)[passNum]);
+    const passes = modelBit.getPasses(stockRadius, stepOver, feedRate);
+    setPasses(passes);
+    setPass(passes[passNum]);
   }, [feedRate, modelBit, passNum, stockRadius, stepOver]); 
   React.useEffect(() => {
     console.log("Changing pass to: ", pass)
@@ -472,8 +475,8 @@ return (
             value={passNum}
             onChange={(e) => setPassNum(parseInt(e.target.value))}
           >
-            {[0, 1, 2, 3, 4].map((_, index) => (
-              <option key={index} value={index}>Pass {index}</option>
+            {passes.map((p, index) => (
+              <option key={index} value={index}>{p.name}</option>
             ))}
           </select>
         </label>
@@ -481,7 +484,7 @@ return (
         <label>
           Step Over:
           <input
-            type="number"
+            type="number" 
             value={stepOver}
             step="0.01"
             min="0"

@@ -13,7 +13,7 @@ type Segment = {
 };
 
 
-export const getMesh = (segments: ISegments, stepOver: number, bitMesh: THREE.Mesh) => { 
+export const getMesh = (segments: ISegments, stepOver: number, bitMesh: THREE.Mesh ) => { 
   const group = new THREE.Group(); 
   const shape = new THREE.Shape();
   let currentPos: THREE.Vector3 | null = null;
@@ -88,7 +88,7 @@ export const getMesh = (segments: ISegments, stepOver: number, bitMesh: THREE.Me
   const markerGeometry = new THREE.SphereGeometry(0.01, 8, 8);
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xff33f9 });
 
-  const path = buildCompleteRasterPath(leftPositions, rightPositions, stepOver, 0.5);
+  const path = buildCompleteRasterPath(leftPositions, rightPositions, stepOver, 0.5 );
 
   leftPositions.forEach(pos => {
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
@@ -263,7 +263,8 @@ const buildCompleteRasterPath = (
   leftPositions: THREE.Vector3[],
   rightPositions: THREE.Vector3[],
   stepOver: number,
-  yOffset: number,) => {
+  yOffset: number, 
+) => {
 
   const path = buildRasterPath(leftPositions, stepOver, yOffset, 'L2R'); 
   const safeZ = (z = 1) => new THREE.Vector3(0,0,z);

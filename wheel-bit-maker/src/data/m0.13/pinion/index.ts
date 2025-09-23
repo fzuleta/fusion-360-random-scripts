@@ -1,9 +1,9 @@
-import * as THREE from 'three';
-import { bit1mm, bit3_175mm, cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
+import { bit1mm, bit3_175mm, cloneSegment, convertPointToSegment } from "../../../helpers";
 import { createBitMesh, generatePath, generateToothPath } from '../../helpers';
 
 import * as wheel from '../../../nihs_20_30/wheel';
 import type { IPass } from '../..';
+import { getLeftRight } from '../wheel';
 
 export const filename = 'm=0.13 z=14.stl';
 
@@ -66,41 +66,7 @@ const _points: Segment[] = [
   })
   return convertPointToSegment(it);
 });
-
-const left = _points.slice(1, 5).map(it => convertPointToSegment(cloneSegment(it)));
-let p0 = cloneSegment(_points[1]);
-p0.to = p0.from.clone();
-p0.from = p0.from.clone().sub(new THREE.Vector3(0.5, 0 ,0))
-left.unshift(convertPointToSegment(p0));
-// point 2
-// p0 = cloneSegment(left[left.length-1]);
-// delete p0.center;
-// p0.from = p0.to.clone(); 
-// p0.to = p0.to.clone().add(new THREE.Vector3(0.05, 0 ,0))
-// left.push(convertPointToSegment(p0));
-
-// Grab the raw point objects for the right-hand profile
-const rawRight = _points.slice(5, 9).map(cloneSegment); 
-const rawRightReversed = reverseSegmentList(rawRight); 
-const right = rawRightReversed.map(convertPointToSegment);
-
-// Add the little vertical “stub” as before (already points the right way)
-p0 = cloneSegment(_points[9]);
-p0.to = p0.from.clone();
-p0.from = p0.from.clone().add(new THREE.Vector3(0.5, 0, 0));
-right.unshift(p0);
-// poin 
-p0 = cloneSegment(right[right.length-1]);
-delete p0.center;
-p0.from = p0.to.clone(); 
-p0.to = p0.to.clone().sub(new THREE.Vector3(0.05, 0 ,0))
-right.push(convertPointToSegment(p0));
-
-export const points: ISegments = {
-  all: _points.map(it => convertPointToSegment(cloneSegment(it))),
-  left,
-  right,
-}
+ 
 
 export const getPasses = (stockRadius: number, stepOver: number, feedRate: number) => {
   const passes: IPass[] = [];
@@ -137,8 +103,9 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].y += bitRadius;
     
     passes.push({ 
+      name: "1. Rough",
       bit, 
-      bitMesh, 
+      bitMesh,  
       rotation: {
         mode: 'repeatPassOverRotation',
         steps: 360 / 8, // every 5 degrees
@@ -186,6 +153,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius; 
 
     passes.push({ 
+      name: "2. Finer Rough",
       bit, 
       bitMesh, 
       rotation: {
@@ -193,7 +161,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
         steps: 360 / 8,  // every 5 degrees
         startAngle: 0, 
         endAngle: 360
-      }, 
+      },  
       ...generatePath({ 
         lineA, 
         lineB: lineB_offset, 
@@ -226,8 +194,9 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     ]; 
  
     passes.push({ 
+      name: "3. Side flatten",
       bit, 
-      bitMesh, 
+      bitMesh,  
       rotation: {
         mode: 'repeatPassOverRotation',
         steps: 90 / 10,  // every 5 degrees
@@ -267,8 +236,9 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       { x: 2,  y: -1.5 - bitRadius,   z },
     ];
     passes.push({ 
+      name: "4. Relief angle",
       bit, 
-      bitMesh, 
+      bitMesh,  
       ...generatePath({ 
         lineA, 
         lineB, 
@@ -286,9 +256,15 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   //=====================================================================
   {
     // Re‑use wheel.getMesh just to obtain the raster TVector3[] path
-    const bit = bit3_175mm;
+    const bit = bit1mm;
     const bitMesh = createBitMesh(bit);
-    const { path } = wheel.getMesh(points, stepOver, bitMesh);
+    const {left, right} = getLeftRight(0.5)
+    const points: ISegments = {
+      all: _points.map(it => convertPointToSegment(cloneSegment(it))),
+      left,
+      right,
+    }
+    const { path } = wheel.getMesh(points, stepOver, bitMesh );
 
     const {
       segmentsForThreeJs,
@@ -296,8 +272,9 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     } = generateToothPath(path);
 
     passes.push({
-      bit: bit3_175mm,
-      bitMesh,
+      name: "5. Tooth",
+      bit,
+      bitMesh, 
       segmentsForThreeJs,
       segmentsForGcodeFitted,
       originalLines: [[], path],

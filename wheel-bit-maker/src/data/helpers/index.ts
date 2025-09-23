@@ -230,7 +230,7 @@ export function pathToSegments(path: TVector3[]): ToolpathSegment[] {
 export const generateToothPath = (path: TVector3[]) => {
   const raw     = pathToSegments(densifyPath(path, 0.2));
   const fitted  = fitArcsInSegments(raw, {
-    tol: 0.05,
+    tol: 0.002,
     minPts: 3,
     arcFrac: 1,
   });
