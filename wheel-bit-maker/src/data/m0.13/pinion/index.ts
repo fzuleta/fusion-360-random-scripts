@@ -1,4 +1,4 @@
-import { bit1mm, bit3_175mm, cloneSegment, convertPointToSegment } from "../../../helpers";
+import { bit1mm, bit3_175mm_2_flute, bit3_175mm_4_flute, cloneSegment, convertPointToSegment } from "../../../helpers";
 import { createBitMesh, generatePath, generateToothPath } from '../../helpers';
 
 import * as wheel from '../../../nihs_20_30/wheel';
@@ -74,7 +74,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   // PASS 0 - Rough shape
   //=====================================================================
   {
-    const bit = bit3_175mm;
+    const bit = bit3_175mm_2_flute;
     const bitMesh = createBitMesh(bit);
     const cutZ = -0.5;
     const z = cutZ;
@@ -177,7 +177,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   // PASS 2 - Side flatten
   //=====================================================================
   {
-    const bit = bit3_175mm;
+    const bit = bit3_175mm_4_flute;
     const bitMesh = createBitMesh(bit);
     const bitRadius = bit.diameter * 0.5
     const cutZ= 0;
@@ -218,7 +218,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   // PASS 3 - Top flatten relief angles
   //=====================================================================
   {
-    const bit = bit3_175mm;
+    const bit = bit3_175mm_4_flute;
     const bitMesh = createBitMesh(bit);
     const bitRadius = bit.diameter * 0.5
     const cutZ= 0.68;

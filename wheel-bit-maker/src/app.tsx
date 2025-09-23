@@ -15,8 +15,8 @@ function App() {
   const [passNum, setPassNum] = React.useState(0);
   // Feed‑rate in mm/min (20 = very slow, 200 = nominal)
   const [feedRate, setFeedRate] = React.useState(2000);
-  const [stepOver, setStepOver] = React.useState(0.2);
-  const [stockRadius] = React.useState(((3/8) * 25.4) / 2); // 6 / 2);
+  const [stepOver, setStepOver] = React.useState(0.2); 
+  const [stockRadius, setStockRadius] = React.useState(((3/8) * 25.4) / 2); // 6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IPass | undefined>(undefined);
   const [passes, setPasses] = React.useState<IPass[]>([]);
@@ -513,20 +513,37 @@ return (
               setFeedRate(v);
             }}
           />
+        </label> 
+        <label>
+          Stock radius (mm):
+          <input
+            type="number"
+            value={stockRadius.toFixed(3)}
+            step="0.1"
+            min="0.5"
+            max="50"
+            style={{ width: 60 }}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (!isNumeric(v)) return;
+              setStockRadius(v);
+            }}
+          />
         </label>
         <button style={{ marginLeft: 8 }} onClick={handleDownloadGcode}>
           ⬇︎&nbsp;Download&nbsp;G‑code
         </button>
+      </div>
+      {/* full‑width scrub slider on its own line */}
+      <div style={{ width: '100%', marginTop: 4, display: 'flex' }}>
+
         <button style={{ marginLeft: 8 }} onClick={() => {
           isAnimationPausedRef.current = !isAnimationPausedRef.current;
         }}>
           {isAnimationPausedRef.current ? '▶︎ Resume' : '❚❚ Pause'}
         </button>
-      </div>
-      {/* full‑width scrub slider on its own line */}
-      <div style={{ width: '100%', marginTop: 4 }}>
-        <label style={{ width: '100%', display: 'flex', alignItems: 'center' }}>
-          Preview&nbsp;%&nbsp;
+        <label style={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+          {/* Preview&nbsp;%&nbsp; */}
           <input
             type="range"
             min={0}

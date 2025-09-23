@@ -1,13 +1,14 @@
 .overlay {
   position: fixed;
-  bottom: 8px;
-  right: 8px;
+  bottom: 2px;
+  right: 2px;
   background-color: rgba(0, 0, 0, 0.8);
   padding: 12px;
   border-radius: 6px;
   color: white;
   font-size: 12px;
   z-index: 1000;
+  max-width: 400px;
   max-height: 400px;
   overflow-y: auto;
 }
@@ -63,7 +64,7 @@
 }
 
 .accordion {
-  margin-bottom: 1rem;
+  margin-bottom: 3px;
   border: 1px solid #333;
   border-radius: 6px;
   background-color: #181818;
