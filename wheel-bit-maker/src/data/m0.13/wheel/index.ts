@@ -232,7 +232,7 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
         mode: 'repeatPassOverRotation',
         steps: 90 / 10,  // every 5 degrees
         startAngle: 0, 
-        endAngle: -230
+        endAngle: -245
       }, 
       ...generatePath({ 
         lineA, 
