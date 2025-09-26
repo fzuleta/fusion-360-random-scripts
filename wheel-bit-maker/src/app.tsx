@@ -3,8 +3,8 @@ import * as React from 'react'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import styles from './app.module.scss'
 import { STLLoader } from 'three-stdlib';
-import { models, type IPass } from './data'; 
-import { degToRad, isNumeric } from './helpers';
+import { models, type IConstructed, type IConstruction } from './data'; 
+import { degToRad, isNumeric, range } from './helpers';
 import {
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
@@ -22,8 +22,9 @@ function App() {
   const [material, setMaterial] = React.useState<Material>('A2');
   const [stockRadius, setStockRadius] = React.useState(6 * 0.5); // ((3/8) * 25.4) / 2); // 6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
-  const [pass, setPass] = React.useState<IPass | undefined>(undefined);
-  const [passes, setPasses] = React.useState<IPass[]>([]);
+  const [pass, setPass] = React.useState<IConstruction | undefined>(undefined);
+  const [constructed, setConstructed] = React.useState<IConstructed | undefined>(undefined);
+  const [passes, setPasses] = React.useState<IConstruction[]>([]);
   // const [lines, setLines] = React.useState<ILinesGotten>();
   const feedRateRef = React.useRef(120);
   const bitMeshRef = React.useRef<THREE.Mesh>(null);
@@ -114,10 +115,9 @@ function App() {
       };
       setOtherThingsToRender(other);
     }
-    
-
-    if (pass.segmentsForThreeJs && pass.segmentsForThreeJs.length) {
-      const path: TVector3[] = pass.segmentsForThreeJs;
+    if (!constructed) { return console.error('no constructed'); }
+    if (constructed.segmentsForThreeJs && constructed.segmentsForThreeJs.length) {
+      const path: TVector3[] = constructed.segmentsForThreeJs;
       pathRef.current = path;
 
       // build geometry
@@ -148,7 +148,7 @@ function App() {
       const line = new THREE.Line(geo, mat);
       toolpathGroupRef.current.add(line);
 
-      drawRotaryVisual(pass.originalLines, pass.rotation);
+      drawRotaryVisual(constructed.originalLines, pass.rotation);
 
       animBit(path);
       return;
@@ -193,7 +193,7 @@ function App() {
     toolpathGroupRef.current.add(lineBottom);
     topToBottomLines.forEach(l => toolpathGroupRef.current!.add(l));
   }
-  const drawRotaryVisual = (originalLines: PointXYZ[][], rotation?: NonNullable<IPass["rotation"]>) => {
+  const drawRotaryVisual = (originalLines: PointXYZ[][], rotation?: NonNullable<IConstruction["rotation"]>) => {
     if (!rotation) { return; }
     const segments: TVector3[] = [];
 
@@ -225,7 +225,7 @@ function App() {
         console.warn("Unknown rotation mode:", rotation.mode);
     }
   };
-  const drawFullPassPerRotation = (segments: TVector3[], rotation: IPass["rotation"]) => {
+  const drawFullPassPerRotation = (segments: TVector3[], rotation: IConstruction["rotation"]) => {
     if (!rotation) { return; }
     const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
     for (let i = 0; i < rotation.steps; i++) {
@@ -237,7 +237,7 @@ function App() {
     }
   };
 
-  const drawOnePassPerRotation = (segments: TVector3[], rotation: IPass["rotation"]) => {
+  const drawOnePassPerRotation = (segments: TVector3[], rotation: IConstruction["rotation"]) => {
     if (!rotation) { return; }
     const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
     const passes: TVector3[][] = [];
@@ -259,7 +259,7 @@ function App() {
     }
   };
 
-  const drawRepeatPassOverRotation = (segments: TVector3[], rotation: IPass["rotation"]) => {
+  const drawRepeatPassOverRotation = (segments: TVector3[], rotation: IConstruction["rotation"]) => {
     if (!rotation) { return; }
     const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
     const passes: TVector3[][] = [];
@@ -313,7 +313,7 @@ function App() {
     });
 
     // ── Wheel modelled as a thin CYLINDER ──────────────── 
-    const bitMesh = pass.bitMesh;
+    const bitMesh = constructed!.bitMesh;
     bitMeshRef.current = bitMesh;
     bitMesh.position.set(10, 10, 0)
     toolpathGroupRef.current!.add(bitMesh);
@@ -331,48 +331,38 @@ function App() {
   }, [feedRate]);
 
   React.useEffect(() => {
-    if (!modelBit) { return; } 
-    const passes = modelBit.getPasses(stockRadius, material);
-    if (!passes) return;
-    setPasses(passes);
-    const pass = passes[passNum];
-    setPass(pass);
-    if (!pass) { return; }
-    setStepOver(pass.bit.material[material]!.stepOver)
-    setFeedRate(pass.bit.material[material]!.feedRate)
-  }, [modelBit, passNum, material]); 
-  React.useEffect(() => {
-    if (!sceneRef.current || !pass) return;
-    console.log('Changing override properties');
-    const construction = {
-      ...pass.construction, 
-      stepOver, 
-      feedRate,
-    }
-    const prevPass = {...pass, ...generatePath(construction)};
-    setPass(prevPass)
-  }, [feedRate, stepOver]); 
-  React.useEffect(() => {
-    if (!sceneRef.current || !passes || !modelBit) return;
-    const newPasses = modelBit.getPasses(stockRadius, material);
-    if (!newPasses) return;
-    const pass = newPasses[passNum];
-    if (!pass) { return; }
-    setPasses(newPasses);
+    setPassNum(0);
+    setMaterial('A2');
+  }, [modelBit]);
 
-    const construction = {
-      ...pass.construction, 
-      stepOver, 
-      feedRate,
-    }
-    const newPass = {...pass, ...generatePath(construction)};
-    setPass(newPass);
-  }, [stockRadius]); 
+
+
+
+
   React.useEffect(() => {
-    console.log("Changing pass to: ", pass)
-    if (!sceneRef.current) return;
+    if (!modelBit) { return; }
+    const pass = modelBit.getPass(passNum)();
+    setPass(pass);
+    setStepOver(pass.defaultBit.material[material]!.stepOver);
+    setFeedRate(pass.defaultBit.material[material]!.feedRate);
+    const constructed = pass.construct({ /** bit, */ material, stockRadius })
+    setConstructed(() => {
+      return constructed;
+    });
+  }, [passNum, material, stockRadius]); 
+  React.useEffect(() => {
+    if (!sceneRef.current || !pass || !constructed) return;
+    const bit: IBit = JSON.parse(JSON.stringify(constructed.bit));
+    bit.material[material]!.feedRate = feedRate;
+    bit.material[material]!.stepOver = stepOver;
+    const newConstructed = pass.construct({ bit, material, stockRadius })
+    setConstructed(newConstructed);
+  }, [feedRate, stepOver, stockRadius]);  
+  React.useEffect(() => {
+    console.log("Changing constructed to: ", constructed)
+    if (!sceneRef.current || !pass || !constructed) return;
     draw();
-  }, [pass]);
+  }, [constructed]);
   React.useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -447,7 +437,7 @@ function App() {
   }, []);
 
   React.useEffect(() => {
-    if (!bitMeshRef.current || pathRef.current.length < 2) return;
+    if (!bitMeshRef.current || pathRef.current.length < 2 || !wheelStateRef) return;
 
     const path = pathRef.current;
     const u = scrub / 100;                       // 0 → 1
@@ -468,12 +458,12 @@ function App() {
 
   /** Download the current pass as G‑code (.nc) */
   const handleDownloadGcode = () => { 
-    if (!pass) return;
+    if (!pass || !constructed) return;
 
     const gcodeLines = generateGCodeFromSegments({
       material,
-      segments: pass.segmentsForGcodeFitted,
-      bit: pass.bit,
+      segments: constructed.segmentsForGcodeFitted,
+      bit: constructed.bit,
       rotation: pass.rotation,
     });
 
@@ -524,8 +514,8 @@ return (
             value={passNum}
             onChange={(e) => setPassNum(parseInt(e.target.value))}
           >
-            {passes.map((p, index) => (
-              <option key={index} value={index}>{p.name}</option>
+            {range(modelBit.getHowManyPasses() || 0).map((p, index) => (
+              <option key={`passNum-${index}`} value={index}>{modelBit.getPass(p)().name}</option>
             ))}
           </select>
         </label>
