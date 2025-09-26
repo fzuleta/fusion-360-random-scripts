@@ -467,14 +467,13 @@ function App() {
 
 
   /** Download the current pass as G‑code (.nc) */
-  const handleDownloadGcode = () => {
-    const current = pass;
-    if (!current) return;
+  const handleDownloadGcode = () => { 
+    if (!pass) return;
 
     const gcodeLines = generateGCodeFromSegments({
       material,
-      segments: current.segmentsForGcodeFitted,
-      bit: current.bit,
+      segments: pass.segmentsForGcodeFitted,
+      bit: pass.bit,
       rotation: pass.rotation,
     });
 
