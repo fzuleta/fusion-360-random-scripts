@@ -102,12 +102,11 @@ export function morphLinesAdaptive({
 export function planSegmentsFromPasses(props: {
   passes: PointXYZ[][];
   safeY: number;        // clearance plane in Y
-  cutZ?: number;         // machining depth
-  stepOver: number;     // radial engagement used when the pass set was built
+  cutZ?: number;         // machining depth 
   baseFeed: number;     // feed‑rate for a full‑width cut
   plungeFeed?: number;  // optional slower plunge / retract feed
 }): ToolpathSegment[] {
-  const { passes, safeY, cutZ, stepOver, baseFeed, plungeFeed = baseFeed * 0.4 } = props;
+  const { passes, safeY, cutZ, baseFeed, plungeFeed = baseFeed * 0.4 } = props;
   const segments: ToolpathSegment[] = []; 
 
   for (const line of passes) {
@@ -134,14 +133,10 @@ export function planSegmentsFromPasses(props: {
     for (let i = 0; i < pts.length - 1; i++) {
       const p0 = pts[i];
       const p1 = pts[i + 1];
-      const dy = Math.abs(p1.y - p0.y);
-      const ratio = Math.max(0.2, Math.min(dy / stepOver, 1));
-      const feed = baseFeed * ratio;
-
       segments.push({
         kind: 'cut',
         pts: [p0, p1],
-        feed,
+        feed: baseFeed,         // constant: use manufacturer mm/min
       });
     }
 
@@ -337,15 +332,27 @@ export function generateGCodeFromSegments(props: {
       case 'cut':
         seg.pts.forEach(p => pushG1(p, seg.feed));
         break;
+      // case 'arc': {
+      //   const [a, b] = seg.pts;
+      //   const { cx, cy, cw } = seg.arc!;
+      //   const g = cw ? 'G2' : 'G3';
+      //   const i = (cx - a.x).toFixed(3);
+      //   const j = (cy - a.y).toFixed(3);
+      //   const needsF = seg.feed !== undefined && seg.feed !== lastFeed;
+      //   if (seg.feed !== undefined && needsF) lastFeed = seg.feed;
+      //   gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)} I${i} J${j}${needsF ? ` F${seg.feed}` : ''}`);
+      //   break;
+      // }
       case 'arc': {
         const [a, b] = seg.pts;
         const { cx, cy, cw } = seg.arc!;
         const g = cw ? 'G2' : 'G3';
         const i = (cx - a.x).toFixed(3);
         const j = (cy - a.y).toFixed(3);
+        const zTerm = b.z !== undefined ? ` Z${b.z.toFixed(3)}` : '';
         const needsF = seg.feed !== undefined && seg.feed !== lastFeed;
         if (seg.feed !== undefined && needsF) lastFeed = seg.feed;
-        gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)} I${i} J${j}${needsF ? ` F${seg.feed}` : ''}`);
+        gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)}${zTerm} I${i} J${j}${needsF ? ` F${seg.feed}` : ''}`);
         break;
       }
     }

@@ -78,16 +78,19 @@ const pass0 = (): IConstruction => {
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
-          steps: 360 / 16, // every 8 degrees
+          steps: 360 / 8, // every 8 degrees
           startAngle: 0, 
           endAngle: 360
         }, 
         ...generatePath({
+          stepOver: matProps.stepOver, 
+          stepOverIsMM: true,
+          alongMaxSegMM: 0.015,
+          arcResMM: 0.01,
           lineA, 
           lineB, 
           stockRadius, 
           bit, 
-          stepOver: matProps.stepOver, 
           feedRate: matProps.feedRate, 
           cutZ,
         }),
@@ -155,11 +158,14 @@ const pass1 = (): IConstruction => {
           endAngle: 360
         }, 
         ...generatePath({
+          stepOver: matProps.stepOver, 
+          stepOverIsMM: true,
+          alongMaxSegMM: 0.015,
+          arcResMM: 0.01,
           lineA, 
           lineB, 
           stockRadius, 
-          bit, 
-          stepOver: matProps.stepOver, 
+          bit,  
           feedRate: matProps.feedRate, 
           cutZ,
         }),
@@ -226,11 +232,14 @@ const pass2 = (): IConstruction => {
           endAngle: -245
         }, 
         ...generatePath({
+          stepOver: matProps.stepOver, 
+          stepOverIsMM: true,
+          alongMaxSegMM: 0.015,
+          arcResMM: 0.01,
           lineA, 
           lineB, 
           stockRadius, 
-          bit, 
-          stepOver: matProps.stepOver, 
+          bit,  
           feedRate: matProps.feedRate, 
           cutZ,
         }),
@@ -290,11 +299,14 @@ const pass3 = (): IConstruction => {
         bit,
         bitMesh,
         ...generatePath({
+          stepOver: matProps.stepOver, 
+          stepOverIsMM: true,
+          alongMaxSegMM: 0.015,
+          arcResMM: 0.01,
           lineA, 
           lineB, 
           stockRadius, 
-          bit, 
-          stepOver: matProps.stepOver, 
+          bit,  
           feedRate: matProps.feedRate, 
           cutZ, 
           passDirection: 'bottom-to-top' as any,
@@ -391,8 +403,11 @@ const pass4 = (): IConstruction => {
         segmentsForThreeJs,
         segmentsForGcodeFitted,
       } = generateToothPath(path, {
-        baseFeed: matProps.feedRate,
-        stepOver: matProps.stepOver,
+        stepOver: matProps.stepOver, 
+        stepOverIsMM: true,
+        alongMaxSegMM: 0.015,
+        arcResMM: 0.01,
+        baseFeed: matProps.feedRate, 
         bitDiameter: bit.diameter,
       });
 

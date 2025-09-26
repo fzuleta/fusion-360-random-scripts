@@ -3,57 +3,77 @@ import * as THREE from 'three';
 import { morphLinesAdaptive, planSegmentsFromPasses, type ToolpathSegment } from '../../toolpath/morph-lines';
 import { fitArcsInSegments } from '../../toolpath/fir-arcs';
 
-
-export const generatePath = (props: {  
-  stepOver: number,  
-  lineA: PointXYZ[], 
-  lineB: PointXYZ[], 
+export const generatePath = (props: {
+  stepOver: number;
+  stepOverIsMM?: boolean;                      // true => stepOver is mm; false => fraction of D
+  lineA: PointXYZ[];
+  lineB: PointXYZ[];
   stockRadius: number;
   bit: IBit;
-  feedRate: number;
+  feedRate: number;                            // manufacturer feed (mm/min)
   cutZ: number;
-  passDirection?: 'top-to-bottom' | 'bottom-to-top';   // NEW
+  passDirection?: 'top-to-bottom' | 'bottom-to-top';
+  alongMaxSegMM?: number;                      // along-path tessellation target (mm)
+  arcResMM?: number;                           // THREE tessellation chord height (mm)
+  arcTolMM?: number;                           // arc-fitting tolerance (mm)
 }) => {
-  const { stepOver, lineA, lineB, stockRadius, bit, feedRate, cutZ, 
-    passDirection = 'top-to-bottom',      // default as today
+  const {
+    stepOver, stepOverIsMM = false,
+    lineA, lineB, stockRadius, bit, feedRate, cutZ,
+    passDirection = 'top-to-bottom',
+    alongMaxSegMM, arcResMM, arcTolMM,
   } = props;
-  // Interpret stepOver ≤ 1 as a fraction of the bit diameter; otherwise it’s already mm
-  const stepOverMM = stepOver <= 1 ? stepOver * bit.diameter : stepOver;
-  const originalLines: PointXYZ[][] = [props.lineA, props.lineB];
-   
-  const morphedLines = morphLinesAdaptive({ lineA, lineB, stepOver: stepOverMM, maxSeg: stepOverMM });
+
+  // Explicit step-over handling (mm vs %D)
+  const stepOverMM = stepOverIsMM ? stepOver : stepOver * bit.diameter;
+
+  // Along-path density independent of radial step-over
+  const maxSegAlong = alongMaxSegMM ?? Math.min(0.20, stepOverMM);
+
+  const morphedLines = morphLinesAdaptive({
+    lineA, lineB,
+    stepOver: stepOverMM,
+    maxSeg: maxSegAlong,
+    maxIter: 100000,
+  });
 
   const passesForMachining =
     passDirection === 'bottom-to-top' ? [...morphedLines].reverse() : morphedLines;
-  
-    // --- choose clearance plane once -------------------------------
-  const clearance = stockRadius + bit.diameter / 2 + 2;   // same formula
-  const safeY =
-    passDirection === 'bottom-to-top' ? -clearance : clearance;
-  
 
+  const clearance = stockRadius + bit.diameter / 2 + 2;
+  const safeY = passDirection === 'bottom-to-top' ? -clearance : clearance;
+
+  // Build segments
   const segmentsRaw = planSegmentsFromPasses({
     passes: passesForMachining,
     safeY,
-    cutZ,
-    stepOver: stepOverMM,
+    cutZ, 
     baseFeed: feedRate,
     plungeFeed: Math.max(1, feedRate * 0.4),
   });
-  const segmentsForGcodeFitted = fitArcsInSegments(segmentsRaw, {
-    tol: 0.05,      // increase tolerance to allow more deviation
-    minPts: 3,      // allow fitting arcs to 3 points instead of 4+
-    arcFrac: 1      // keep this as-is to allow full-pass fitting
-  });
-  console.log("cut:", segmentsRaw.filter(s => s.kind === 'cut').length);
-  console.log("arc:", segmentsForGcodeFitted.filter(s => s.kind === 'arc').length);
-  return {
-    originalLines,
-    morphedLines,
-    segmentsForThreeJs: segmentsToVectorPath(segmentsForGcodeFitted, 1.5), // for THREE to draw
-    segmentsForGcodeFitted, // for GCODE to export
+
+  // Normalize feeds: constant during cutting (use manufacturer feed)
+  for (const s of segmentsRaw) {
+    if (s.kind === 'cut') s.feed = feedRate;
   }
-}
+
+  // Fit arcs with a sensible tolerance (tighter if micro step-over)
+  const fitted = fitArcsInSegments(segmentsRaw, {
+    tol: arcTolMM ?? (stepOverMM <= 0.05 ? 0.01 : 0.02),
+    minPts: 3,
+    arcFrac: 1,
+  });
+
+  return {
+    originalLines: [lineA, lineB],
+    morphedLines,
+    segmentsForThreeJs: segmentsToVectorPath(
+      fitted,
+      arcResMM ?? Math.min(0.20, maxSegAlong)
+    ),
+    segmentsForGcodeFitted: fitted,
+  };
+};
 
 export const convertLinesToVector3s = (line: PointXYZ[]) => {
   const path: THREE.Vector3[] = [];
@@ -211,9 +231,7 @@ export function pathToSegments(
   path: TVector3[],
   opts?: { baseFeed?: number; stepOverMM?: number; minFeedFrac?: number }
 ): ToolpathSegment[] {
-  const baseFeed    = opts?.baseFeed;
-  const stepOverMM  = opts?.stepOverMM;
-  const minFeedFrac = opts?.minFeedFrac ?? 0.2;
+  const baseFeed    = opts?.baseFeed; 
 
   const segs: ToolpathSegment[] = [];
   for (let i = 0; i < path.length - 1; i++) {
@@ -232,10 +250,8 @@ export function pathToSegments(
       ],
     };
 
-    if (kind === 'cut' && baseFeed !== undefined && stepOverMM !== undefined && stepOverMM > 0) {
-      const dy     = Math.abs(b.y - a.y);
-      const ratio  = Math.max(minFeedFrac, Math.min(dy / stepOverMM, 1));
-      seg.feed     = Math.max(1, baseFeed * ratio);
+     if (kind === 'cut' && baseFeed !== undefined) {
+      seg.feed = Math.max(1, baseFeed);  // constant feed during cutting
     }
     segs.push(seg);
   }
@@ -248,26 +264,41 @@ export function pathToSegments(
  */
 export const generateToothPath = (
   path: TVector3[],
-  opts: { baseFeed: number; stepOver: number; bitDiameter: number }
+  opts: {
+    baseFeed: number;                          // manufacturer feed (mm/min)
+    stepOver: number;                          // mm or %D (see flag)
+    bitDiameter: number;
+    stepOverIsMM?: boolean;                    // true => stepOver is mm
+    alongMaxSegMM?: number;                    // along-path tessellation target (mm)
+    arcResMM?: number;                         // THREE tessellation chord height (mm)
+    arcTolMM?: number;                         // arc-fitting tolerance (mm)
+  }
 ) => {
-  const stepOverMM = opts.stepOver <= 1 ? opts.stepOver * opts.bitDiameter : opts.stepOver;
+  const stepOverMM = opts.stepOverIsMM ? opts.stepOver : opts.stepOver * opts.bitDiameter;
+  const maxSegAlong = opts.alongMaxSegMM ?? Math.min(0.20, stepOverMM);
 
-  const raw = pathToSegments(densifyPath(path, 0.2), {
-    baseFeed: opts.baseFeed,
-    stepOverMM,
+  // Densify preview path; convert to segments without dy-based throttling
+  const raw = pathToSegments(densifyPath(path, maxSegAlong), {
+    baseFeed: opts.baseFeed,                   // do NOT pass stepOverMM here (avoids dy-scaling)
   });
 
-  const fitted  = fitArcsInSegments(raw, {
-    tol: 0.002,
+  // Constant feed during cutting
+  for (const s of raw) {
+    if (s.kind === 'cut') s.feed = Math.max(1, opts.baseFeed);
+  }
+
+  const fitted = fitArcsInSegments(raw, {
+    tol: opts.arcTolMM ?? (stepOverMM <= 0.05 ? 0.01 : 0.02),
     minPts: 3,
     arcFrac: 1,
   });
 
-  const segmentsForThreeJs = segmentsToVectorPath(fitted, 1.5);
-  return {
-    segmentsForThreeJs,
-    segmentsForGcodeFitted: fitted,
-  };
+  const segmentsForThreeJs = segmentsToVectorPath(
+    fitted,
+    opts.arcResMM ?? Math.min(0.20, maxSegAlong)
+  );
+
+  return { segmentsForThreeJs, segmentsForGcodeFitted: fitted };
 };
 
 
