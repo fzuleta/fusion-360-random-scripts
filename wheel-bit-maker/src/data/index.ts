@@ -27,13 +27,13 @@ export interface IConstruction {
   name: string; 
   type: 'lines' | 'tooth'; 
   defaultBit: IBit;
-  rotation?: {
-    mode: TRotationMode;
-    steps: number;
-    startAngle: number;
-    endAngle: number;
-    angleAfterCompleted?: number;
-  };
+  // rotation?: {
+  //   mode: TRotationMode;
+  //   steps: number;
+  //   startAngle: number;
+  //   endAngle: number;
+  //   angleAfterCompleted?: number;
+  // };
   construct: (props: IConstructProps) => IConstructed;
 }
 

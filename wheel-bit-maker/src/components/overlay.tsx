@@ -1,14 +1,14 @@
 import React from 'react';
 import * as THREE from 'three'; 
-import styles from './overlay.module.scss';
-import type { IPass } from '../data';
+import styles from './overlay.module.scss'; 
+import type { IConstructed } from '../data';
 
 interface IProps {
-  pass?: IPass,
+  constructed?: IConstructed,
   toolpathGroupRef: React.RefObject<THREE.Group | null>,
 }
 export const Overlay = (props: IProps) => { 
-  return !props.pass ? null : <div className={styles.overlay}>
+  return !props.constructed ? null : <div className={styles.overlay}>
   <Rotation {...props} />
   <Segments {...props} /> 
   <WhatIsThisProject {...props} /> 
@@ -26,15 +26,15 @@ const Segments = (props: IProps) => {
   const endRefs = React.useRef<THREE.Mesh[]>([]); 
 
   React.useEffect(() => {
-    if (!props.pass) { return setsegments([]); }
-    const segments = props.pass.originalLines;
+    if (!props.constructed) { return setsegments([]); }
+    const segments = props.constructed.originalLines;
     if (!segments || segments.length === 0) { return setsegments([]); }
     console.log('segments',segments)
     setsegments(segments);
     setstart(segments[0] ?? []);
     setsecond(segments[1] ?? []);
     setend(segments[segments.length - 1] ?? []);
-  }, [props.pass]);
+  }, [props.constructed]);
 
   React.useEffect(() => {
     if (!props.toolpathGroupRef?.current) return;
@@ -165,21 +165,21 @@ const Rotation=(props: IProps) => {
     <div style={{ marginBottom: '1rem', fontSize: '0.9em', color: '#aaa' }}>
       <strong>Rotation Strategy:</strong>{' '}
 
-      {!props.pass?.rotation && <>No Rotation</>}
-      {props.pass?.rotation && <>
-        {props.pass.rotation?.mode === 'noRotation' && 'fallback/default'}
-        {props.pass.rotation?.mode === 'fullPassPerRotation' && 'Do the entire path, then rotate. Repeat.'}
-        {props.pass.rotation?.mode === 'onePassPerRotation' && 'Each pass (cut-retract group) is done once per rotation step.'}
-        {props.pass.rotation?.mode === 'repeatPassOverRotation' && 'Each pass is repeated at every rotary step before moving to next.'}
+      {!props.constructed?.rotation && <>No Rotation</>}
+      {props.constructed?.rotation && <>
+        {props.constructed.rotation?.mode === 'noRotation' && 'fallback/default'}
+        {props.constructed.rotation?.mode === 'fullPassPerRotation' && 'Do the entire path, then rotate. Repeat.'}
+        {props.constructed.rotation?.mode === 'onePassPerRotation' && 'Each pass (cut-retract group) is done once per rotation step.'}
+        {props.constructed.rotation?.mode === 'repeatPassOverRotation' && 'Each pass is repeated at every rotary step before moving to next.'}
 
         <br />
-        <strong>Steps:</strong> {props.pass.rotation.steps}
+        <strong>Steps:</strong> {props.constructed.rotation.steps}
         <br />
-        <strong>Angle Range:</strong> {props.pass.rotation.startAngle}° to {props.pass.rotation.endAngle}°
-        {props.pass.rotation.angleAfterCompleted !== undefined && (
+        <strong>Angle Range:</strong> {props.constructed.rotation.startAngle}° to {props.constructed.rotation.endAngle}°
+        {props.constructed.rotation.angleAfterCompleted !== undefined && (
           <>
             <br />
-            <strong>Angle After Completion:</strong> {props.pass.rotation.angleAfterCompleted}°
+            <strong>Angle After Completion:</strong> {props.constructed.rotation.angleAfterCompleted}°
           </>
         )}
       </>}

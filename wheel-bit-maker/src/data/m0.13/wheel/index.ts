@@ -106,7 +106,7 @@ const pass0 = (): IConstruction => {
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
-          steps: 360 / 8, // every 5 degrees
+          steps: 360 / 16, // every 8 degrees
           startAngle: 0, 
           endAngle: 360
         }, 
@@ -401,13 +401,7 @@ const pass4 = (): IConstruction => {
   return {
     name: "5. Tooth", 
     type: 'tooth',
-    defaultBit: bit,
-    rotation: {
-      mode: 'repeatPassOverRotation',
-      steps: 45 / 3, 
-      startAngle: 0, 
-      endAngle: -45,
-    },
+    defaultBit: bit, 
     construct: (props: {bit?: IBit; material: TMaterial; stockRadius: number}) => {
       const material = props.material;
       const b: IBit = props.bit || bit;
@@ -422,7 +416,11 @@ const pass4 = (): IConstruction => {
       const {
         segmentsForThreeJs,
         segmentsForGcodeFitted,
-      } = generateToothPath(path );
+      } = generateToothPath(path, {
+        baseFeed: matProps.feedRate,
+        stepOver: matProps.stepOver,
+        bitDiameter: bit.diameter,
+      });
 
       return {
         bit,

@@ -8,8 +8,7 @@ import { degToRad, isNumeric, range } from './helpers';
 import {
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
-import { Overlay } from './components/overlay';
-import { generatePath } from './data/helpers';
+import { Overlay } from './components/overlay'; 
 
 type Material = 'brass' | 'A2' | '316L';
 
@@ -24,7 +23,6 @@ function App() {
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IConstruction | undefined>(undefined);
   const [constructed, setConstructed] = React.useState<IConstructed | undefined>(undefined);
-  const [passes, setPasses] = React.useState<IConstruction[]>([]);
   // const [lines, setLines] = React.useState<ILinesGotten>();
   const feedRateRef = React.useRef(120);
   const bitMeshRef = React.useRef<THREE.Mesh>(null);
@@ -148,7 +146,7 @@ function App() {
       const line = new THREE.Line(geo, mat);
       toolpathGroupRef.current.add(line);
 
-      drawRotaryVisual(constructed.originalLines, pass.rotation);
+      drawRotaryVisual(constructed.originalLines, constructed.rotation);
 
       animBit(path);
       return;
@@ -193,7 +191,7 @@ function App() {
     toolpathGroupRef.current.add(lineBottom);
     topToBottomLines.forEach(l => toolpathGroupRef.current!.add(l));
   }
-  const drawRotaryVisual = (originalLines: PointXYZ[][], rotation?: NonNullable<IConstruction["rotation"]>) => {
+  const drawRotaryVisual = (originalLines: PointXYZ[][], rotation?: NonNullable<IConstructed["rotation"]>) => {
     if (!rotation) { return; }
     const segments: TVector3[] = [];
 
@@ -225,7 +223,7 @@ function App() {
         console.warn("Unknown rotation mode:", rotation.mode);
     }
   };
-  const drawFullPassPerRotation = (segments: TVector3[], rotation: IConstruction["rotation"]) => {
+  const drawFullPassPerRotation = (segments: TVector3[], rotation: IConstructed["rotation"]) => {
     if (!rotation) { return; }
     const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
     for (let i = 0; i < rotation.steps; i++) {
@@ -237,7 +235,7 @@ function App() {
     }
   };
 
-  const drawOnePassPerRotation = (segments: TVector3[], rotation: IConstruction["rotation"]) => {
+  const drawOnePassPerRotation = (segments: TVector3[], rotation: IConstructed["rotation"]) => {
     if (!rotation) { return; }
     const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
     const passes: TVector3[][] = [];
@@ -259,7 +257,7 @@ function App() {
     }
   };
 
-  const drawRepeatPassOverRotation = (segments: TVector3[], rotation: IConstruction["rotation"]) => {
+  const drawRepeatPassOverRotation = (segments: TVector3[], rotation: IConstructed["rotation"]) => {
     if (!rotation) { return; }
     const angleStep = (rotation.endAngle - rotation.startAngle) / rotation.steps;
     const passes: TVector3[][] = [];
@@ -439,20 +437,24 @@ function App() {
   React.useEffect(() => {
     if (!bitMeshRef.current || pathRef.current.length < 2 || !wheelStateRef) return;
 
-    const path = pathRef.current;
-    const u = scrub / 100;                       // 0 → 1
-    const last = path.length - 1;
-    const idx = Math.floor(u * last);
-    const t   = (u * last) - idx;
+    try {
+      const path = pathRef.current;
+      const u = scrub / 100;                       // 0 → 1
+      const last = path.length - 1;
+      const idx = Math.floor(u * last);
+      const t   = (u * last) - idx;
 
-    const a = path[idx];
-    const b = path[Math.min(idx + 1, last)];
+      const a = path[idx];
+      const b = path[Math.min(idx + 1, last)];
 
-    const pos = new THREE.Vector3().lerpVectors(a, b, t);
-    bitMeshRef.current.position.copy(pos);
-    // sync animBit to the slider
-    wheelStateRef.current.i = idx;
-    wheelStateRef.current.t = t;
+      const pos = new THREE.Vector3().lerpVectors(a, b, t);
+      bitMeshRef.current.position.copy(pos);
+      // sync animBit to the slider
+      wheelStateRef.current.i = idx;
+      wheelStateRef.current.t = t;
+    } catch (e) {
+      console.error(e)
+    }
   }, [scrub]);
 
 
@@ -464,7 +466,7 @@ function App() {
       material,
       segments: constructed.segmentsForGcodeFitted,
       bit: constructed.bit,
-      rotation: pass.rotation,
+      rotation: constructed.rotation,
     });
 
     const blob = new Blob([gcodeLines.join('\n')], { type: 'text/plain' });
@@ -598,7 +600,7 @@ return (
       </div>
       
     </div>
-    <Overlay pass={ pass } toolpathGroupRef={toolpathGroupRef} />
+    <Overlay constructed={ constructed } toolpathGroupRef={toolpathGroupRef} />
     <div ref={mountRef} className={styles.canvas} />
   </div>
 )

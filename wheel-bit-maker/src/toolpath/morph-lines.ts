@@ -144,9 +144,9 @@ export function planSegmentsFromPasses(props: {
         feed,
       });
     }
-    
-    // 4) retract back up in Y
-    segments.push({ kind: 'retract', pts: [{ x: last.x, y: safeY, z: last.z }], feed: plungeFeed });
+
+    // 4) retract back up in Y (rapid)
+    segments.push({ kind: 'rapid', pts: [{ x: last.x, y: safeY, z: last.z }] });
   }
 
   return segments;
@@ -297,11 +297,11 @@ export function generateGCodeFromSegments(props: {
     `G43 Z30.0 H${bit.toolNumber}`, // length offset + safe height
   ];
 
-  // Safe XY move before Z descent
-  const firstRetract = segments.find(s => s.kind === 'retract' && s.pts.length > 0);
-  if (firstRetract) {
-    const pt = firstRetract.pts[0];
-    gcode.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} ; pre-position XY at safe Z (retract)`);
+  // Pre-position XY at safe Z to the very first commanded point
+  const firstPtSeg = segments.find(s => s.pts.length > 0);
+  if (firstPtSeg) {
+    const pt = firstPtSeg.pts[0];
+    gcode.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} ; pre-position XY at safe Z`);
   }
 
   const hasRotary   = !!rotation;
@@ -315,18 +315,27 @@ export function generateGCodeFromSegments(props: {
   }
 
   let lastFeed: number | undefined = undefined;
-  const line = (cmd: 'G0' | 'G1', p: PointXYZ, feed?: number) =>
-    `${cmd} X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}${feed ? ` F${feed}` : ''}`;
+
+  const pushG0 = (p: PointXYZ) =>
+    gcode.push(`G0 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}`);
+
+  const pushG1 = (p: PointXYZ, feed?: number) => {
+    const needsF = feed !== undefined && feed !== lastFeed;
+    if (feed !== undefined && needsF) lastFeed = feed;
+    gcode.push(
+      `G1 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}${needsF ? ` F${feed}` : ''}`
+    );
+  };
 
   const emitSeg = (seg: ToolpathSegment) => {
     switch (seg.kind) {
       case 'rapid':
-        seg.pts.forEach(p => gcode.push(line('G0', p)));
+      case 'retract': // treat retracts as true rapids in G‑code
+        seg.pts.forEach(pushG0);
         break;
       case 'plunge':
-      case 'retract':
       case 'cut':
-        seg.pts.forEach(p => gcode.push(line('G1', p, seg.feed)));
+        seg.pts.forEach(p => pushG1(p, seg.feed));
         break;
       case 'arc': {
         const [a, b] = seg.pts;
@@ -334,9 +343,9 @@ export function generateGCodeFromSegments(props: {
         const g = cw ? 'G2' : 'G3';
         const i = (cx - a.x).toFixed(3);
         const j = (cy - a.y).toFixed(3);
-        const feed = seg.feed !== undefined && seg.feed !== lastFeed ? ` F${seg.feed}` : '';
-        if (seg.feed !== undefined) lastFeed = seg.feed;
-        gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)} I${i} J${j}${feed}`);
+        const needsF = seg.feed !== undefined && seg.feed !== lastFeed;
+        if (seg.feed !== undefined && needsF) lastFeed = seg.feed;
+        gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)} I${i} J${j}${needsF ? ` F${seg.feed}` : ''}`);
         break;
       }
     }

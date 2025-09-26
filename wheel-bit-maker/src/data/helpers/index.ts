@@ -17,9 +17,12 @@ export const generatePath = (props: {
   const { stepOver, lineA, lineB, stockRadius, bit, feedRate, cutZ, 
     passDirection = 'top-to-bottom',      // default as today
   } = props;
+  // Interpret stepOver ≤ 1 as a fraction of the bit diameter; otherwise it’s already mm
+  const stepOverMM = stepOver <= 1 ? stepOver * bit.diameter : stepOver;
   const originalLines: PointXYZ[][] = [props.lineA, props.lineB];
-  const morphedLines = morphLinesAdaptive({ lineA, lineB, stepOver, maxSeg: stepOver });
-  
+   
+  const morphedLines = morphLinesAdaptive({ lineA, lineB, stepOver: stepOverMM, maxSeg: stepOverMM });
+
   const passesForMachining =
     passDirection === 'bottom-to-top' ? [...morphedLines].reverse() : morphedLines;
   
@@ -28,14 +31,15 @@ export const generatePath = (props: {
   const safeY =
     passDirection === 'bottom-to-top' ? -clearance : clearance;
   
+
   const segmentsRaw = planSegmentsFromPasses({
     passes: passesForMachining,
-    safeY, // 2 mm clearance
-    cutZ,                               // -0.5 demo depth
-    stepOver,
+    safeY,
+    cutZ,
+    stepOver: stepOverMM,
     baseFeed: feedRate,
-    plungeFeed: feedRate * 0.4,
-  }); 
+    plungeFeed: Math.max(1, feedRate * 0.4),
+  });
   const segmentsForGcodeFitted = fitArcsInSegments(segmentsRaw, {
     tol: 0.05,      // increase tolerance to allow more deviation
     minPts: 3,      // allow fitting arcs to 3 points instead of 4+
@@ -131,13 +135,14 @@ export function segmentsToVectorPath(
   for (const s of segs) {
     switch (s.kind) {
       case 'rapid':
+        s.pts.forEach(p => push(new THREE.Vector3(p.x, p.y, p.z), 'rapid'));
+        break;
       case 'plunge':
       case 'retract':
+        s.pts.forEach(p => push(new THREE.Vector3(p.x, p.y, p.z), 'retract'));
+        break;
       case 'cut':
-        s.pts.forEach(p =>
-          push(new THREE.Vector3(p.x, p.y, p.z), 
-               s.kind === 'cut' ? 'cut' : 'retract')
-        );
+        s.pts.forEach(p => push(new THREE.Vector3(p.x, p.y, p.z), 'cut'));
         break;
       case 'arc': {
         const [a, b] = s.pts;
@@ -202,23 +207,37 @@ export function densifyPath(
  * Convert a display‑path (TVector3[]) into raw ToolpathSegment[]
  * preserving cut / retract / rapid semantics for the G‑code exporter.
  */
-export function pathToSegments(path: TVector3[]): ToolpathSegment[] {
+export function pathToSegments(
+  path: TVector3[],
+  opts?: { baseFeed?: number; stepOverMM?: number; minFeedFrac?: number }
+): ToolpathSegment[] {
+  const baseFeed    = opts?.baseFeed;
+  const stepOverMM  = opts?.stepOverMM;
+  const minFeedFrac = opts?.minFeedFrac ?? 0.2;
+
   const segs: ToolpathSegment[] = [];
   for (let i = 0; i < path.length - 1; i++) {
     const a = path[i];
     const b = path[i + 1];
-    if (a.equals(b)) continue;                // skip zero‑length hops
-    const kind =
-      a.isCut      ? 'cut'     :
-      a.isRetract  ? 'retract' :
-      'rapid';
-    segs.push({
+    if (a.equals(b)) continue;
+
+    const isCut = !!(a as any).isCut;
+    const kind: ToolpathSegment['kind'] = isCut ? 'cut' : 'rapid'; // retracts/rapids both → G0
+
+    const seg: ToolpathSegment = {
       kind,
       pts: [
         { x: a.x, y: a.y, z: a.z },
         { x: b.x, y: b.y, z: b.z },
       ],
-    } as ToolpathSegment);
+    };
+
+    if (kind === 'cut' && baseFeed !== undefined && stepOverMM !== undefined && stepOverMM > 0) {
+      const dy     = Math.abs(b.y - a.y);
+      const ratio  = Math.max(minFeedFrac, Math.min(dy / stepOverMM, 1));
+      seg.feed     = Math.max(1, baseFeed * ratio);
+    }
+    segs.push(seg);
   }
   return segs;
 }
@@ -227,23 +246,26 @@ export function pathToSegments(path: TVector3[]): ToolpathSegment[] {
  * Feed a raster path through the same preview / G‑code pipeline that
  * `generatePath` uses for the first passes.
  */
-export const generateToothPath = (path: TVector3[]) => {
-  const raw     = pathToSegments(densifyPath(path, 0.2));
+export const generateToothPath = (
+  path: TVector3[],
+  opts: { baseFeed: number; stepOver: number; bitDiameter: number }
+) => {
+  const stepOverMM = opts.stepOver <= 1 ? opts.stepOver * opts.bitDiameter : opts.stepOver;
+
+  const raw = pathToSegments(densifyPath(path, 0.2), {
+    baseFeed: opts.baseFeed,
+    stepOverMM,
+  });
+
   const fitted  = fitArcsInSegments(raw, {
     tol: 0.002,
     minPts: 3,
     arcFrac: 1,
   });
 
-
   const segmentsForThreeJs = segmentsToVectorPath(fitted, 1.5);
-  // For preview/animation we keep the **original path** – it already
-  // contains many intermediate points (every `state.speed` from
-  // wheel.getMesh).  Using it directly gives smooth motion, whereas the
-  // fitted‑segments representation collapses long moves to just two
-  // endpoints.
   return {
-    segmentsForThreeJs, // smoother preview
+    segmentsForThreeJs,
     segmentsForGcodeFitted: fitted,
   };
 };
