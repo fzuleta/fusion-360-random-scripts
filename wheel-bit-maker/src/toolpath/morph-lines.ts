@@ -266,6 +266,7 @@ const densifyLine = (line: PointXYZ[], maxSeg: number): PointXYZ[] => {
  * The caller is expected to create the segments with `planSegmentsFromPasses`.
  */
 export function generateGCodeFromSegments(props: {
+  material: TMaterial,
   bit: IBit;
   segments: ToolpathSegment[];
   rotation?: {
@@ -276,7 +277,11 @@ export function generateGCodeFromSegments(props: {
     angleAfterCompleted?: number;
   }
 }): string[] {
-  const { bit, segments, rotation } = props;
+  const { bit, material, segments, rotation } = props;
+  const spindleSpeed = bit.material[material]?.spindleSpeed || 15000;
+  if (!bit.material[material]?.spindleSpeed) {
+    alert('Spindle speed not found in material, defaulting to 15_000 rpm');
+  }
   const gcode: string[] = [
     'G90 G94 G91.1 G40 G49 G17', // abs, mm/min, IJ inc, cancel comp, XY plane
     'G21',                       // metric
@@ -285,7 +290,7 @@ export function generateGCodeFromSegments(props: {
 
     `( TOOL ${bit.toolNumber}  Ø${bit.diameter.toFixed(3)} CVD-DIA )`,
     `T${bit.toolNumber} M6`,
-    `S${bit.spindleSpeed} M3`,
+    `S${spindleSpeed} M3`,
     'G04 P1.0' ,                // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
     'M8',                       // air / coolant on
     'G54',                      // work offset

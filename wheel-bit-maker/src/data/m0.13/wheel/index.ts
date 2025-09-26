@@ -1,12 +1,13 @@
 import * as THREE from 'three';
-import { bit1mm, bit3_175mm_2_flute, bit3_175mm_4_flute, cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
+import * as carbideBits from "../../../helpers/carbide-bits";
+import {cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
 import { createBitMesh, generatePath, generateToothPath } from '../../helpers';
 
 import * as wheel from '../../../nihs_20_30/wheel';
 import type { IPass } from '../..';
 
 export const filename = 'm=0.13 Z=112.stl';
-
+const bits = carbideBits;
 const bottomCut = -0.6
 
 const _points: Segment[] = [
@@ -100,28 +101,33 @@ export const getLeftRight = (offsetX: number = 0.5) => {
 }
 
 
-export const getPasses = (stockRadius: number, stepOver: number, feedRate: number) => {
+export const getPasses = (stockRadius: number, material: TMaterial) => {
   const passes: IPass[] = [];
   //=====================================================================
   // PASS 0 - Rough shape
   //=====================================================================
   {
-    const bit = bit3_175mm_2_flute;
+    const bit = bits.bit3_175mm_4_flute_chino;
+    const matProps = bit.material[material];
+    if (!matProps) { 
+      alert('Material not found'); 
+      return undefined; 
+    }
     const bitMesh = createBitMesh(bit);
     const cutZ = -0.5;
     const bitRadius = bit.diameter * 0.5; 
 
     const lineA = [ // the border of the stock
       { x: 3, y: stockRadius, z: cutZ }, 
-      { x: -15.6, y: stockRadius, z: cutZ }
+      { x: -17, y: stockRadius, z: cutZ }
     ];
     const lineB =  // the inner profile
       [
         { x: 3, y: 1.3, z: cutZ },
         { x: -0.42, y: 1.3, z: cutZ },
         { x: -0.42, y: 0.7, z: cutZ },
-        { x: -10, y: 0.7, z: cutZ },
-        { x: -15.6, y: stockRadius, z: cutZ }
+        { x: -15, y: 0.7, z: cutZ },
+        { x: -17, y: stockRadius, z: cutZ }
       ];
 
     lineA.forEach(it => it.y += bitRadius);
@@ -133,32 +139,39 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].y += bitRadius;
     
+    const construction = {
+      lineA, 
+      lineB: lineB_offset, 
+      stockRadius, 
+      bit, 
+      stepOver: matProps.stepOver, 
+      feedRate: matProps.feedRate, 
+      cutZ,
+    }
     passes.push({ 
       name: "1. Rough",
       bit, 
       bitMesh,  
+      construction,
       rotation: {
         mode: 'repeatPassOverRotation',
         steps: 360 / 8, // every 5 degrees
         startAngle: 0, 
         endAngle: 360
       }, 
-      ...generatePath({ 
-        lineA, 
-        lineB: lineB_offset, 
-        stockRadius, 
-        stepOver, 
-        bit, 
-        feedRate, 
-        cutZ,
-      }), 
+      ...generatePath(construction), 
     });
   }
   //=====================================================================
   // PASS 1 - rough shape more detail
   //=====================================================================
   {
-    const bit = bit1mm;
+    const bit = bits.bit1_6mm_2_flute;
+    const matProps = bit.material[material];
+    if (!matProps) { 
+      alert('Material not found'); 
+      return undefined; 
+    }
     const bitMesh = createBitMesh(bit);
     const bitRadius = bit.diameter * 0.5
     const cutZ = -0.5;
@@ -183,32 +196,39 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
     i++;  lineB_offset[i].x -= bitRadius; lineB_offset[i].y += bitRadius;
     i++;  lineB_offset[i].x += bitRadius; lineB_offset[i].y += bitRadius;
 
+    const construction = { 
+      lineA, 
+      lineB: lineB_offset, 
+      stockRadius, 
+      bit, 
+      stepOver: matProps.stepOver, 
+      feedRate: matProps.feedRate, 
+      cutZ
+    }
     passes.push({ 
       name: "2. Finer Rough",
       bit, 
-      bitMesh,  
+      bitMesh,
+      construction,
       rotation: {
         mode: 'repeatPassOverRotation',
         steps: 360 / 8,  // every 5 degrees
         startAngle: 0, 
         endAngle: 360
       }, 
-      ...generatePath({ 
-        lineA, 
-        lineB: lineB_offset, 
-        stepOver, 
-        stockRadius, 
-        bit, 
-        feedRate, 
-        cutZ
-      }),
+      ...generatePath(construction),
     });
   }
   //=====================================================================
   // PASS 2 - Side flatten
   //=====================================================================
   {
-    const bit = bit3_175mm_4_flute;
+    const bit = bits.bit3_175mm_4_flute_chino;
+    const matProps = bit.material[material];
+    if (!matProps) { 
+      alert('Material not found'); 
+      return undefined; 
+    }
     const bitMesh = createBitMesh(bit);
     const bitRadius = bit.diameter * 0.5
     const cutZ= 0;
@@ -224,32 +244,39 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       { x: -2.0, y: 0.7 + bitRadius, z: 0 }
     ]; 
  
+    const construction = { 
+      lineA, 
+      lineB, 
+      stockRadius, 
+      bit, 
+      stepOver: matProps.stepOver, 
+      feedRate: matProps.feedRate, 
+      cutZ,
+    } 
     passes.push({ 
       name: "3. Side flatten",
       bit, 
-      bitMesh,  
+      bitMesh,
+      construction,
       rotation: {
         mode: 'repeatPassOverRotation',
         steps: 90 / 10,  // every 5 degrees
         startAngle: 0, 
         endAngle: -245
       }, 
-      ...generatePath({ 
-        lineA, 
-        lineB, 
-        stockRadius, 
-        stepOver, 
-        bit, 
-        feedRate, 
-        cutZ,
-      }),
+      ...generatePath(construction),
     });
   }
   //=====================================================================
   // PASS 3 - Top flatten relief angles
   //=====================================================================
   {
-    const bit = bit3_175mm_4_flute;
+    const bit = bits.bit3_175mm_4_flute_chino;
+    const matProps = bit.material[material];
+    if (!matProps) { 
+      alert('Material not found'); 
+      return undefined; 
+    }
     const bitMesh = createBitMesh(bit);
     const bitRadius = bit.diameter * 0.5
     const cutZ= 0.68;
@@ -266,20 +293,23 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       { x: -3,  y: -1.5 - bitRadius,   z },
       { x: 2,  y: -1.5 - bitRadius,   z },
     ]; 
+
+    const construction = { 
+      lineA, 
+      lineB, 
+      stockRadius, 
+      bit, 
+      stepOver: matProps.stepOver, 
+      feedRate: matProps.feedRate, 
+      cutZ, 
+      passDirection: 'bottom-to-top' as any,
+    }
     passes.push({ 
       name: "4. Relief angle",
       bit, 
-      bitMesh,  
-      ...generatePath({ 
-        lineA, 
-        lineB, 
-        stockRadius, 
-        stepOver, 
-        bit, 
-        feedRate, 
-        cutZ, 
-        passDirection: 'bottom-to-top'
-      }),
+      bitMesh,
+      construction,
+      ...generatePath(construction),
     });
   }
   //=====================================================================
@@ -287,7 +317,12 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
   //=====================================================================
   {
     // Re‑use wheel.getMesh just to obtain the raster TVector3[] path
-    const bit = bit1mm;
+    const bit = bits.bit3_175mm_4_flute_harveyTool;
+    const matProps = bit.material[material];
+    if (!matProps) { 
+      alert('Material not found'); 
+      return undefined; 
+    }
     const bitMesh = createBitMesh(bit); 
     const {left, right} = getLeftRight(0.5)
     const points: ISegments = {
@@ -295,20 +330,24 @@ export const getPasses = (stockRadius: number, stepOver: number, feedRate: numbe
       left,
       right,
     }
-    const { path } = wheel.getMesh(points, stepOver, bitMesh );
+    const { path } = wheel.getMesh(points, matProps.stepOver, bitMesh );
 
     const {
       segmentsForThreeJs,
       segmentsForGcodeFitted,
     } = generateToothPath(path);
-
+ 
+    const construction = {
+      segmentsForThreeJs,
+      segmentsForGcodeFitted,
+      originalLines: [[], path],
+    }
     passes.push({
       name: "5. Tooth",
       bit,
       bitMesh, 
-      segmentsForThreeJs,
-      segmentsForGcodeFitted,
-      originalLines: [[], path],
+      construction,
+      ...construction,
       rotation: {
         mode: 'repeatPassOverRotation',
         steps: 45 / 3, 

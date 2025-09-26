@@ -9,6 +9,9 @@ import {
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
 import { Overlay } from './components/overlay';
+import { generatePath } from './data/helpers';
+
+type Material = 'brass' | 'A2' | '316L';
 
 function App() {
   const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
@@ -16,7 +19,8 @@ function App() {
   // Feed‑rate in mm/min (20 = very slow, 200 = nominal)
   const [feedRate, setFeedRate] = React.useState(2000);
   const [stepOver, setStepOver] = React.useState(0.2); 
-  const [stockRadius, setStockRadius] = React.useState(((3/8) * 25.4) / 2); // 6 / 2);
+  const [material, setMaterial] = React.useState<Material>('A2');
+  const [stockRadius, setStockRadius] = React.useState(6 * 0.5); // ((3/8) * 25.4) / 2); // 6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IPass | undefined>(undefined);
   const [passes, setPasses] = React.useState<IPass[]>([]);
@@ -325,13 +329,45 @@ function App() {
   React.useEffect(() => {
     feedRateRef.current = feedRate;
   }, [feedRate]);
+
   React.useEffect(() => {
-    if (!modelBit) { return; }
-    console.log("Changing stepOver to: ", stepOver);
-    const passes = modelBit.getPasses(stockRadius, stepOver, feedRate);
+    if (!modelBit) { return; } 
+    const passes = modelBit.getPasses(stockRadius, material);
+    if (!passes) return;
     setPasses(passes);
-    setPass(passes[passNum]);
-  }, [feedRate, modelBit, passNum, stockRadius, stepOver]); 
+    const pass = passes[passNum];
+    setPass(pass);
+    if (!pass) { return; }
+    setStepOver(pass.bit.material[material]!.stepOver)
+    setFeedRate(pass.bit.material[material]!.feedRate)
+  }, [modelBit, passNum, material]); 
+  React.useEffect(() => {
+    if (!sceneRef.current || !pass) return;
+    console.log('Changing override properties');
+    const construction = {
+      ...pass.construction, 
+      stepOver, 
+      feedRate,
+    }
+    const prevPass = {...pass, ...generatePath(construction)};
+    setPass(prevPass)
+  }, [feedRate, stepOver]); 
+  React.useEffect(() => {
+    if (!sceneRef.current || !passes || !modelBit) return;
+    const newPasses = modelBit.getPasses(stockRadius, material);
+    if (!newPasses) return;
+    const pass = newPasses[passNum];
+    if (!pass) { return; }
+    setPasses(newPasses);
+
+    const construction = {
+      ...pass.construction, 
+      stepOver, 
+      feedRate,
+    }
+    const newPass = {...pass, ...generatePath(construction)};
+    setPass(newPass);
+  }, [stockRadius]); 
   React.useEffect(() => {
     console.log("Changing pass to: ", pass)
     if (!sceneRef.current) return;
@@ -436,6 +472,7 @@ function App() {
     if (!current) return;
 
     const gcodeLines = generateGCodeFromSegments({
+      material,
       segments: current.segmentsForGcodeFitted,
       bit: current.bit,
       rotation: pass.rotation,
@@ -466,6 +503,19 @@ return (
             {Object.keys(models).map((key) => (
               <option key={key} value={key}>{key}</option>
             ))}
+          </select>
+        </label>
+
+        <label>
+          Material:
+          <select
+            value={material}
+            onChange={(e) => setMaterial(e.target.value as Material)}
+          >
+            {/* <option value="brass">brass</option> */}
+            <option value="A2">A2</option>
+            {/* <option value="316L">316L</option> */}
+            {/* <option value="316L">carbide</option> */}
           </select>
         </label>
 

@@ -10,6 +10,7 @@ export type IPass = {
   originalLines: PointXYZ[][], 
   segmentsForThreeJs: TVector3[][],
   segmentsForGcodeFitted  : ToolpathSegment[]; 
+  construction: any;
   rotation?: {
     mode: TRotationMode;
     steps: number;
@@ -21,7 +22,7 @@ export type IPass = {
 
 interface IModel {
   filename: string;
-  getPasses: (stockRadius: number, stepOver: number, feedRate: number) => IPass[];
+  getPasses: (stockRadius: number, material: TMaterial) => IPass[] | undefined;
   // points: ISegments;
 }
 export const models: {[key: string]: IModel} = {

@@ -36,7 +36,20 @@ type Segment = {
 };
 declare type ITeethPoint =  {from: PointXYZ, to: PointXYZ, center?: PointXYZ & {anticlockwise?: boolean}}
 
-declare type IBit = {diameter: number, height: number, toolNumber: number, spindleSpeed: number }
+declare type TMaterial = 'brass' | 'A2' | '316L' | 'carbide';
+declare type IBit = {
+  diameter: number, 
+  height: number, 
+  toolNumber: number,
+
+  material: {
+    [material in TMaterial]?: {
+      spindleSpeed: number;
+      feedRate: number;
+      stepOver: number;
+    }
+  }
+}
 
 declare type TVector3 = THREE.Vector3 & {isRetract?: boolean; isCut?: boolean }
 
