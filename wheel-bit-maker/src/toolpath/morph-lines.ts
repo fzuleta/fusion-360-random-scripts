@@ -44,7 +44,7 @@ export interface GCodeSettings {
 
 export const DEFAULT_GCODE_SETTINGS: GCodeSettings = {
   workOffset: 'G54',
-  safeRetract: { z: 30 },
+  safeRetract: { z: 0 },
   machineActions: {
     homeZBeforeStart: true,
     homeZAfterEnd: true,
