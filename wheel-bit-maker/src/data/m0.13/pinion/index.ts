@@ -65,8 +65,8 @@ const pass0 = (): IConstruction => {
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
-      const bitRadius = bit.diameter * 0.5; 
-      const bitMesh = createBitMesh(bit); 
+      const bitRadius = b.diameter * 0.5; 
+      const bitMesh = createBitMesh(b); 
       const matProps = b.material[material];
       if (!matProps) { 
         alert('Material not found'); 
@@ -74,7 +74,7 @@ const pass0 = (): IConstruction => {
       }
       const {lineA, lineB} = applyBitRadiusAndStockRadius(bitRadius, stockRadius);
       return {
-        bit,
+        bit: b,
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
@@ -90,7 +90,7 @@ const pass0 = (): IConstruction => {
           lineA, 
           lineB, 
           stockRadius, 
-          bit, 
+          bit: b,
           feedRate: matProps.feedRate, 
           cutZ,
         }),
@@ -141,8 +141,8 @@ const pass1 = (): IConstruction => {
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
-      const bitRadius = bit.diameter * 0.5; 
-      const bitMesh = createBitMesh(bit); 
+      const bitRadius = b.diameter * 0.5; 
+      const bitMesh = createBitMesh(b); 
       const matProps = b.material[material];
       if (!matProps) { 
         alert('Material not found'); 
@@ -150,7 +150,7 @@ const pass1 = (): IConstruction => {
       }
       const {lineA, lineB} = applyBitRadiusAndStockRadius(bitRadius, stockRadius);
       return {
-        bit,
+        bit: b,
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
@@ -166,7 +166,7 @@ const pass1 = (): IConstruction => {
           lineA, 
           lineB, 
           stockRadius, 
-          bit,  
+          bit: b,
           feedRate: matProps.feedRate, 
           cutZ,
         }),
@@ -216,8 +216,8 @@ const pass2 = (): IConstruction => {
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
-      const bitRadius = bit.diameter * 0.5; 
-      const bitMesh = createBitMesh(bit); 
+      const bitRadius = b.diameter * 0.5; 
+      const bitMesh = createBitMesh(b); 
       const matProps = b.material[material];
       if (!matProps) { 
         alert('Material not found'); 
@@ -225,7 +225,7 @@ const pass2 = (): IConstruction => {
       }
       const {lineA, lineB} = applyBitRadiusAndStockRadius(bitRadius, stockRadius);
       return {
-        bit,
+        bit: b,
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
@@ -241,7 +241,7 @@ const pass2 = (): IConstruction => {
           lineA, 
           lineB, 
           stockRadius, 
-          bit,  
+          bit: b,
           feedRate: matProps.feedRate, 
           cutZ,
         }),
@@ -290,8 +290,8 @@ const pass3 = (): IConstruction => {
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
-      const bitRadius = bit.diameter * 0.5; 
-      const bitMesh = createBitMesh(bit); 
+      const bitRadius = b.diameter * 0.5; 
+      const bitMesh = createBitMesh(b); 
       const matProps = b.material[material];
       if (!matProps) { 
         alert('Material not found'); 
@@ -299,7 +299,7 @@ const pass3 = (): IConstruction => {
       }
       const {lineA, lineB} = applyBitRadiusAndStockRadius(bitRadius, stockRadius);
       return {
-        bit,
+        bit: b,
         bitMesh,
         ...generatePath({
           stepOver: matProps.stepOver, 
@@ -309,7 +309,7 @@ const pass3 = (): IConstruction => {
           lineA, 
           lineB, 
           stockRadius, 
-          bit,  
+          bit: b,
           feedRate: matProps.feedRate, 
           cutZ, 
           passDirection: 'bottom-to-top' as any,
@@ -394,7 +394,7 @@ const pass4 = (): IConstruction => {
     construct: (props: {bit?: IBit; material: TMaterial; stockRadius: number}) => {
       const material = props.material;
       const b: IBit = props.bit || bit;
-      const bitMesh = createBitMesh(bit); 
+      const bitMesh = createBitMesh(b); 
       const matProps = b.material[material];
       if (!matProps) { 
         alert('Material not found'); 
@@ -411,11 +411,11 @@ const pass4 = (): IConstruction => {
         alongMaxSegMM: 0.015,
         arcResMM: 0.01,
         baseFeed: matProps.feedRate, 
-        bitDiameter: bit.diameter,
+        bitDiameter: b.diameter,
       });
 
       return {
-        bit,
+        bit: b,
         bitMesh,
         segmentsForThreeJs,
         segmentsForGcodeFitted,

@@ -5,19 +5,11 @@ import styles from './app.module.scss'
 import { STLLoader } from 'three-stdlib';
 import { models, type IConstructed, type IConstruction } from './data'; 
 import { degToRad, isNumeric, range } from './helpers';
+import { bitCatalog, getBitKey, getBitMaterials } from './helpers/carbide-bits';
 import {
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
 import { Overlay } from './components/overlay'; 
-
-const MATERIAL_OPTIONS: TMaterial[] = [
-  'brass-Rough',
-  'brass-Finish',
-  'A2-Rough',
-  'A2-Finish',
-  '316L',
-  'carbide',
-];
 
 function App() {
   const otherThingsToRenderRef = React.useRef<{[k: string]: () => unknown}>({});
@@ -26,6 +18,7 @@ function App() {
   const [feedRate, setFeedRate] = React.useState(2000);
   const [stepOver, setStepOver] = React.useState(0.2); 
   const [material, setMaterial] = React.useState<TMaterial>('A2-Rough');
+  const [selectedBitKey, setSelectedBitKey] = React.useState(bitCatalog[0]?.key ?? '');
   const [stockRadius, setStockRadius] = React.useState(6 * 0.5); // ((3/8) * 25.4) / 2); // 6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IConstruction | undefined>(undefined);
@@ -47,6 +40,8 @@ function App() {
   const wheelStateRef = React.useRef<{ i: number; t: number }>({ i: 0, t: 0 });
   // Animation pause state
   const isAnimationPausedRef = React.useRef(false);
+  const selectedBit = bitCatalog.find((bitOption) => bitOption.key === selectedBitKey)?.bit ?? pass?.defaultBit;
+  const availableMaterials = selectedBit ? getBitMaterials(selectedBit) : [];
 
   const draw = () => {
     if (!sceneRef.current) return; 
@@ -339,7 +334,6 @@ function App() {
 
   React.useEffect(() => {
     setPassNum(0);
-    setMaterial('A2-Rough');
   }, [modelBit]);
 
 
@@ -348,23 +342,34 @@ function App() {
 
   React.useEffect(() => {
     if (!modelBit) { return; }
-    const pass = modelBit.getPass(passNum)();
-    setPass(pass);
-    setStepOver(pass.defaultBit.material[material]!.stepOver);
-    setFeedRate(pass.defaultBit.material[material]!.feedRate);
-    const constructed = pass.construct({ /** bit, */ material, stockRadius })
-    setConstructed(() => {
-      return constructed;
-    });
-  }, [modelBit, passNum, material, stockRadius]); 
+    const nextPass = modelBit.getPass(passNum)();
+    setPass(nextPass);
+    const defaultBitKey = getBitKey(nextPass.defaultBit);
+    if (defaultBitKey) {
+      setSelectedBitKey(defaultBitKey);
+    }
+  }, [modelBit, passNum]);
   React.useEffect(() => {
-    if (!sceneRef.current || !pass) return;
-    const bit: IBit = JSON.parse(JSON.stringify(pass.defaultBit));
+    if (!availableMaterials.length) { return; }
+    if (!availableMaterials.includes(material)) {
+      setMaterial(availableMaterials[0]);
+      return;
+    }
+    const bitMaterial = selectedBit?.material[material];
+    if (!bitMaterial) { return; }
+    setStepOver(bitMaterial.stepOver);
+    setFeedRate(bitMaterial.feedRate);
+    if (!pass || !selectedBit) { return; }
+    setConstructed(pass.construct({ bit: selectedBit, material, stockRadius }));
+  }, [material, pass, selectedBit, stockRadius]);
+  React.useEffect(() => {
+    if (!sceneRef.current || !pass || !selectedBit) return;
+    const bit: IBit = JSON.parse(JSON.stringify(selectedBit));
     bit.material[material]!.feedRate = feedRate;
     bit.material[material]!.stepOver = stepOver;
     const newConstructed = pass.construct({ bit, material, stockRadius })
     setConstructed(newConstructed);
-  }, [feedRate, stepOver, stockRadius, pass, material]);  
+  }, [feedRate, stepOver, stockRadius, pass, material, selectedBit]);  
   React.useEffect(() => {
     console.log("Changing constructed to: ", constructed)
     if (!sceneRef.current || !pass || !constructed) return;
@@ -513,12 +518,24 @@ return (
         </label>
 
         <label>
+          Bit:
+          <select
+            value={selectedBitKey}
+            onChange={(e) => setSelectedBitKey(e.target.value)}
+          >
+            {bitCatalog.map((bitOption) => (
+              <option key={bitOption.key} value={bitOption.key}>{bitOption.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label>
           Material:
           <select
             value={material}
             onChange={(e) => setMaterial(e.target.value as TMaterial)}
           >
-            {MATERIAL_OPTIONS.map((materialOption) => (
+            {availableMaterials.map((materialOption) => (
               <option key={materialOption} value={materialOption}>{materialOption}</option>
             ))}
           </select>

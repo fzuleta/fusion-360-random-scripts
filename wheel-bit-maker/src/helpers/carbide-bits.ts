@@ -87,3 +87,20 @@ export const bit6_35mm_4_flute_chino: IBit = {
   }
 }
 
+export const bitCatalog: Array<{ key: string; label: string; bit: IBit }> = [
+  { key: 'bit1mm', label: '1.0 mm', bit: bit1mm },
+  { key: 'bit1_6mm_2_flute', label: '1.6256 mm 2 flute', bit: bit1_6mm_2_flute },
+  { key: 'bit3_175mm_2_flute', label: '3.175 mm 2 flute', bit: bit3_175mm_2_flute },
+  { key: 'bit3_175mm_4_flute_harveyTool', label: '3.175 mm 4 flute Harvey Tool', bit: bit3_175mm_4_flute_harveyTool },
+  { key: 'bit3_175mm_4_flute_chino', label: '3.175 mm 4 flute Chino', bit: bit3_175mm_4_flute_chino },
+  { key: 'bit6_35mm_4_flute_chino', label: '6.35 mm 4 flute Chino', bit: bit6_35mm_4_flute_chino },
+];
+
+export const getBitKey = (bit: IBit): string | undefined => {
+  return bitCatalog.find((entry) => entry.bit === bit)?.key;
+};
+
+export const getBitMaterials = (bit: IBit): TMaterial[] => {
+  return Object.keys(bit.material) as TMaterial[];
+};
+
