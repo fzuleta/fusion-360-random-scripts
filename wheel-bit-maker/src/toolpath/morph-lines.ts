@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 export type MotionKind = 'rapid' | 'plunge' | 'cut' | 'arc' | 'retract';
 
 export interface ArcExtras {
@@ -13,6 +15,48 @@ export interface ToolpathSegment {
   feed?: number;
   arc?: ArcExtras;      // only defined when kind === 'arc'
 }
+
+type RotationConfig = {
+  mode: TRotationMode;
+  steps: number;
+  startAngle: number;
+  endAngle: number;
+  angleAfterCompleted?: number;
+};
+
+export interface MachineActionSettings {
+  homeZBeforeStart: boolean;
+  homeZAfterEnd: boolean;
+  homeXYAfterEnd: boolean;
+  resetRotaryAfterEnd: boolean;
+}
+
+export interface GCodeSettings {
+  workOffset: string;
+  spindleSpeed?: number;
+  safeRetract: {
+    x?: number;
+    y?: number;
+    z: number;
+  };
+  machineActions: MachineActionSettings;
+}
+
+export const DEFAULT_GCODE_SETTINGS: GCodeSettings = {
+  workOffset: 'G54',
+  safeRetract: { z: 30 },
+  machineActions: {
+    homeZBeforeStart: true,
+    homeZAfterEnd: true,
+    homeXYAfterEnd: true,
+    resetRotaryAfterEnd: true,
+  },
+};
+
+const normalizeWorkOffset = (value: string) => value.trim().toUpperCase();
+
+const isValidWorkOffset = (value: string) =>
+  /^G5[4-9]$/.test(value) || /^G54\.1\s+P\d+$/i.test(value);
 
 export interface MorphAdaptiveProps {
   lineA: PointXYZ[];
@@ -264,15 +308,10 @@ export function generateGCodeFromSegments(props: {
   material: TMaterial,
   bit: IBit;
   segments: ToolpathSegment[];
-  rotation?: {
-    mode: TRotationMode;
-    steps: number;
-    startAngle: number;
-    endAngle: number;
-    angleAfterCompleted?: number;
-  }
+  rotation?: RotationConfig;
+  settings?: GCodeSettings;
 }): string[] {
-  const { bit, material, segments, rotation } = props;
+  const { bit, material, segments, rotation, settings } = props;
 
   if (rotation) {
     if (!Number.isFinite(rotation.steps) || !Number.isInteger(rotation.steps) || rotation.steps <= 0) {
@@ -280,32 +319,61 @@ export function generateGCodeFromSegments(props: {
     }
   }
 
-  const spindleSpeed = bit.material[material]?.spindleSpeed || 15000;
-  if (!bit.material[material]?.spindleSpeed) {
-    alert('Spindle speed not found in material, defaulting to 15_000 rpm');
+  const materialSpindleSpeed = bit.material[material]?.spindleSpeed;
+  if (settings?.spindleSpeed !== undefined && (!Number.isFinite(settings.spindleSpeed) || settings.spindleSpeed <= 0)) {
+    throw new Error(`Spindle speed must be a positive number, got ${settings.spindleSpeed}`);
   }
+  if (settings?.spindleSpeed === undefined && materialSpindleSpeed === undefined) {
+    throw new Error('Spindle speed is required. Set an RPM in Post Settings or define one on the selected bit/material.');
+  }
+  const spindleSpeed = Math.round(settings?.spindleSpeed ?? materialSpindleSpeed ?? 0);
+  const workOffset = normalizeWorkOffset(settings?.workOffset ?? DEFAULT_GCODE_SETTINGS.workOffset);
+  if (!isValidWorkOffset(workOffset)) {
+    throw new Error(`Unsupported work offset: ${workOffset}. Use G54-G59 or G54.1 Pn.`);
+  }
+  const safeRetract = {
+    ...DEFAULT_GCODE_SETTINGS.safeRetract,
+    ...settings?.safeRetract,
+  };
+  const machineActions = {
+    ...DEFAULT_GCODE_SETTINGS.machineActions,
+    ...settings?.machineActions,
+  };
+  if (safeRetract.x !== undefined && !Number.isFinite(safeRetract.x)) {
+    throw new Error(`safe retract X must be a finite number, got ${safeRetract.x}`);
+  }
+  if (safeRetract.y !== undefined && !Number.isFinite(safeRetract.y)) {
+    throw new Error(`safe retract Y must be a finite number, got ${safeRetract.y}`);
+  }
+  if (!Number.isFinite(safeRetract.z)) {
+    throw new Error(`safe retract Z must be a finite number, got ${safeRetract.z}`);
+  }
+
   const gcode: string[] = [
     'G90 G94 G91.1 G40 G49 G17', // abs, mm/min, IJ inc, cancel comp, XY plane
     'G21',                       // metric
-    'G28 G91 Z0.',               // retract to machine Z-home
-    'G90',
-
     `( TOOL ${bit.toolNumber}  Ø${bit.diameter.toFixed(3)} CVD-DIA )`,
     `T${bit.toolNumber} M6`,
     `S${spindleSpeed} M3`,
     'G04 P1.0' ,                // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
     'M8',                       // air / coolant on
-    'G54',                      // work offset
-    `G43 Z30.0 H${bit.toolNumber}`, // length offset + safe height
+    workOffset,                 // work offset
+    `G43 Z${safeRetract.z.toFixed(1)} H${bit.toolNumber}`, // length offset + safe height
   ];
-  const safeRetractZ = 30.0;
+  if (machineActions.homeZBeforeStart) {
+    gcode.splice(2, 0, 'G28 G91 Z0.', 'G90');
+  }
+  const safeRetractZ = safeRetract.z;
   const approachOffsetZ = 1.0;
+  let lastFeed: number | undefined = undefined;
+  let lastMotionPoint: PointXYZ | undefined;
 
   // Pre-position XY at safe Z to the very first commanded point
   const firstPtSeg = segments.find(s => s.pts.length > 0);
   if (firstPtSeg) {
     const pt = firstPtSeg.pts[0];
     gcode.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} ; pre-position XY at safe Z`);
+    lastMotionPoint = { x: pt.x, y: pt.y, z: safeRetractZ };
   }
 
   const hasRotary   = !!rotation;
@@ -317,9 +385,6 @@ export function generateGCodeFromSegments(props: {
   if (hasRotary) {
     gcode.push(`G0 A${aStart.toFixed(3)}    ; set rotary start`);
   }
-
-  let lastFeed: number | undefined = undefined;
-  let lastMotionPoint: PointXYZ | undefined = undefined;
 
   const isSamePoint = (a: PointXYZ, b: PointXYZ) =>
     a.x === b.x && a.y === b.y && a.z === b.z;
@@ -345,9 +410,17 @@ export function generateGCodeFromSegments(props: {
 
   const retractForRotaryIndex = () => {
     if (!lastMotionPoint) return;
-    if (lastMotionPoint.z >= safeRetractZ) return;
-    gcode.push(`G0 Z${safeRetractZ.toFixed(1)}`);
-    lastMotionPoint = { ...lastMotionPoint, z: safeRetractZ };
+    if (lastMotionPoint.z < safeRetractZ) {
+      gcode.push(`G0 Z${safeRetractZ.toFixed(1)}`);
+      lastMotionPoint = { ...lastMotionPoint, z: safeRetractZ };
+    }
+    if (safeRetract.x !== undefined || safeRetract.y !== undefined) {
+      pushG0({
+        x: safeRetract.x ?? lastMotionPoint.x,
+        y: safeRetract.y ?? lastMotionPoint.y,
+        z: safeRetractZ,
+      });
+    }
   };
 
   const prepareForFeedMove = (target: PointXYZ) => {
@@ -406,30 +479,6 @@ export function generateGCodeFromSegments(props: {
         break;
       }
     }
-  };
-
-  const splitSegmentsIntoPasses = (allSegments: ToolpathSegment[]): ToolpathSegment[][] => {
-    const passes: ToolpathSegment[][] = [];
-    let buf: ToolpathSegment[] = [];
-    let sawCutMotion = false;
-
-    allSegments.forEach(seg => {
-      buf.push(seg);
-
-      if (seg.kind === 'plunge' || seg.kind === 'cut' || seg.kind === 'arc') {
-        sawCutMotion = true;
-      }
-
-      // A pass ends at the first rapid after any cut/plunge motion.
-      if (seg.kind === 'rapid' && sawCutMotion) {
-        passes.push(buf);
-        buf = [];
-        sawCutMotion = false;
-      }
-    });
-
-    if (buf.length) passes.push(buf);
-    return passes;
   };
 
   if (!rotation || rotation.mode === 'fullPassPerRotation') {
@@ -494,15 +543,274 @@ export function generateGCodeFromSegments(props: {
     gcode.push(`G0 A${rotation.angleAfterCompleted.toFixed(3)}`);
   }
 
-  gcode.push(...[
-    'M9',                      // Coolant off (turns off air or flood)
-    'M5',                      // Spindle stop
-    'G28 G91 Z0.',             // Home Z-axis (machine zero) using relative mode
-    'G90',                     // Restore absolute positioning
-    'G0 A0.',                  // Return rotary axis A to zero position
-    'G28 G91 X0. Y0.',         // Home X and Y axes (machine zero) using relative mode
-    'G90',                     // Ensure we're back in absolute mode
-    'M30'                      // Program end and rewind
-  ]);
+  gcode.push('M9');            // Coolant off (turns off air or flood)
+  gcode.push('M5');            // Spindle stop
+
+  if (machineActions.homeZAfterEnd) {
+    gcode.push('G28 G91 Z0.');
+    gcode.push('G90');
+  }
+
+  if (machineActions.resetRotaryAfterEnd && hasRotary) {
+    gcode.push('G0 A0.');
+  }
+
+  if (machineActions.homeXYAfterEnd) {
+    gcode.push('G28 G91 X0. Y0.');
+    gcode.push('G90');
+  }
+
+  gcode.push('M30');           // Program end and rewind
   return gcode;
+}
+
+export function splitSegmentsIntoPasses(allSegments: ToolpathSegment[]): ToolpathSegment[][] {
+  const passes: ToolpathSegment[][] = [];
+  let buf: ToolpathSegment[] = [];
+  let sawCutMotion = false;
+
+  allSegments.forEach(seg => {
+    buf.push(seg);
+
+    if (seg.kind === 'plunge' || seg.kind === 'cut' || seg.kind === 'arc') {
+      sawCutMotion = true;
+    }
+
+    // A pass ends at the first rapid after any cut/plunge motion.
+    if (seg.kind === 'rapid' && sawCutMotion) {
+      passes.push(buf);
+      buf = [];
+      sawCutMotion = false;
+    }
+  });
+
+  if (buf.length) passes.push(buf);
+  return passes;
+}
+
+export function buildMachinePreviewPath(props: {
+  segments: ToolpathSegment[];
+  rotation?: RotationConfig;
+  safeRetract?: GCodeSettings['safeRetract'];
+  approachOffsetZ?: number;
+  arcRes?: number;
+}): TVector3[] {
+  const {
+    segments,
+    rotation,
+    safeRetract = DEFAULT_GCODE_SETTINGS.safeRetract,
+    approachOffsetZ = 1,
+    arcRes = 0.2,
+  } = props;
+
+  if (rotation) {
+    if (!Number.isFinite(rotation.steps) || !Number.isInteger(rotation.steps) || rotation.steps <= 0) {
+      throw new Error(`rotation.steps must be a positive integer, got ${rotation.steps}`);
+    }
+  }
+
+  const out: TVector3[] = [];
+  let lastMotionPoint: PointXYZ | undefined;
+  const safeRetractZ = safeRetract.z;
+
+  const isSamePoint = (a: PointXYZ, b: PointXYZ) =>
+    a.x === b.x && a.y === b.y && a.z === b.z;
+
+  const isSameXY = (a: PointXYZ, b: PointXYZ) =>
+    a.x === b.x && a.y === b.y;
+
+  const pushPoint = (p: PointXYZ, kind: 'cut' | 'rapid' | 'arc') => {
+    const v = new THREE.Vector3(p.x, p.y, p.z) as TVector3;
+    v.isCut = kind === 'cut';
+    v.isRapid = kind === 'rapid';
+    v.isArc = kind === 'arc';
+
+    const prev = out[out.length - 1];
+    if (prev && prev.equals(v)) {
+      prev.isCut = prev.isCut || v.isCut;
+      prev.isRapid = prev.isRapid || v.isRapid;
+      prev.isArc = prev.isArc || v.isArc;
+      return;
+    }
+
+    out.push(v);
+  };
+
+  const pushRapidTo = (p: PointXYZ) => {
+    if (lastMotionPoint && isSamePoint(lastMotionPoint, p)) return;
+    pushPoint(p, 'rapid');
+    lastMotionPoint = p;
+  };
+
+  const pushCutTo = (p: PointXYZ, kind: 'cut' | 'arc' = 'cut') => {
+    if (lastMotionPoint && isSamePoint(lastMotionPoint, p)) return;
+    pushPoint(p, kind);
+    lastMotionPoint = p;
+  };
+
+  const retractForRotaryIndex = () => {
+    if (!lastMotionPoint) return;
+    if (lastMotionPoint.z < safeRetractZ) {
+      pushRapidTo({ ...lastMotionPoint, z: safeRetractZ });
+    }
+    if (safeRetract.x !== undefined || safeRetract.y !== undefined) {
+      pushRapidTo({
+        x: safeRetract.x ?? lastMotionPoint.x,
+        y: safeRetract.y ?? lastMotionPoint.y,
+        z: safeRetractZ,
+      });
+    }
+  };
+
+  const prepareForFeedMove = (target: PointXYZ) => {
+    if (!lastMotionPoint) {
+      pushRapidTo({ x: target.x, y: target.y, z: safeRetractZ });
+    }
+    if (!lastMotionPoint) return;
+
+    const approachZ = Math.min(safeRetractZ, target.z + approachOffsetZ);
+
+    if (!isSameXY(lastMotionPoint, target)) {
+      pushRapidTo({ x: target.x, y: target.y, z: lastMotionPoint.z });
+    }
+
+    if (lastMotionPoint.z > approachZ) {
+      pushRapidTo({ x: target.x, y: target.y, z: approachZ });
+    }
+  };
+
+  const tessellateArc = (seg: ToolpathSegment): PointXYZ[] => {
+    const [a, b] = seg.pts;
+    const { cx, cy, r, cw } = seg.arc!;
+    const a0 = Math.atan2(a.y - cy, a.x - cx);
+    const a1 = Math.atan2(b.y - cy, b.x - cx);
+    const span = cw
+      ? (a0 > a1 ? a0 - a1 : a0 - a1 + 2 * Math.PI)
+      : (a1 > a0 ? a1 - a0 : a1 - a0 + 2 * Math.PI);
+    const steps = Math.min(200, Math.max(2, Math.ceil(r * span / arcRes)));
+    const pts: PointXYZ[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const ang = cw ? a0 - span * t : a0 + span * t;
+      pts.push({
+        x: cx + r * Math.cos(ang),
+        y: cy + r * Math.sin(ang),
+        z: a.z + (b.z - a.z) * t,
+      });
+    }
+    return pts;
+  };
+
+  const emitSegmentAtAngle = (seg: ToolpathSegment, _angleDeg: number) => {
+    switch (seg.kind) {
+      case 'rapid':
+      case 'retract':
+        seg.pts.forEach(pushRapidTo);
+        break;
+      case 'plunge': {
+        prepareForFeedMove(seg.pts[0]);
+        seg.pts.forEach(p => pushCutTo(p));
+        break;
+      }
+      case 'cut': {
+        prepareForFeedMove(seg.pts[0]);
+        seg.pts.forEach(p => pushCutTo(p));
+        break;
+      }
+      case 'arc': {
+        const pts = tessellateArc(seg);
+        prepareForFeedMove(pts[0]);
+        pts.forEach(p => pushCutTo(p, 'arc'));
+        break;
+      }
+    }
+  };
+
+  const hasRotary = !!rotation;
+  const aStart = rotation?.startAngle ?? 0;
+  const aEnd = rotation?.endAngle ?? 360;
+  const totalAngle = aEnd - aStart;
+  const angleStep = hasRotary ? totalAngle / rotation.steps : 0;
+
+  if (!rotation || rotation.mode === 'fullPassPerRotation') {
+    for (let step = 0; step < (hasRotary ? rotation.steps : 1); step++) {
+      const currentAngle = aStart + step * angleStep;
+      if (hasRotary) {
+        retractForRotaryIndex();
+      }
+      segments.forEach(seg => emitSegmentAtAngle(seg, currentAngle));
+    }
+  } else if (rotation.mode === 'onePassPerRotation') {
+    const passes = splitSegmentsIntoPasses(segments);
+    if (passes.length !== rotation.steps) {
+      throw new Error(`onePassPerRotation requires passes (${passes.length}) to equal rotation.steps (${rotation.steps})`);
+    }
+
+    let currentAngle = aStart;
+    passes.forEach((pass, idx) => {
+      if (idx > 0) {
+        currentAngle += angleStep;
+        retractForRotaryIndex();
+      }
+      pass.forEach(seg => emitSegmentAtAngle(seg, currentAngle));
+    });
+  } else if (rotation.mode === 'repeatPassOverRotation') {
+    const passes = splitSegmentsIntoPasses(segments);
+    passes.forEach((pass) => {
+      retractForRotaryIndex();
+      for (let step = 0; step < rotation.steps; step++) {
+        const angle = aStart + step * angleStep;
+        if (step > 0) {
+          retractForRotaryIndex();
+        }
+        pass.forEach(seg => emitSegmentAtAngle(seg, angle));
+      }
+    });
+  } else {
+    segments.forEach(seg => emitSegmentAtAngle(seg, 0));
+  }
+
+  return out;
+}
+
+export function buildMachineDisplayPath(props: {
+  segments: ToolpathSegment[];
+  rotation?: RotationConfig;
+  safeRetract?: GCodeSettings['safeRetract'];
+  approachOffsetZ?: number;
+  arcRes?: number;
+}): TVector3[] {
+  const { segments, rotation, safeRetract, approachOffsetZ, arcRes } = props;
+
+  if (!rotation || rotation.mode === 'fullPassPerRotation') {
+    return buildMachinePreviewPath({
+      segments,
+      rotation: rotation
+        ? {
+            ...rotation,
+            steps: 1,
+            endAngle: rotation.startAngle,
+          }
+        : undefined,
+      safeRetract,
+      approachOffsetZ,
+      arcRes,
+    });
+  }
+
+  const passes = splitSegmentsIntoPasses(segments);
+  const firstPass = passes[0] ?? [];
+  return buildMachinePreviewPath({
+    segments: firstPass,
+    rotation: {
+      mode: 'fullPassPerRotation',
+      steps: 1,
+      startAngle: rotation.startAngle,
+      endAngle: rotation.startAngle,
+      angleAfterCompleted: rotation.angleAfterCompleted,
+    },
+    safeRetract,
+    approachOffsetZ,
+    arcRes,
+  });
 }

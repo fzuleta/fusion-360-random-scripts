@@ -2,19 +2,207 @@ import React from 'react';
 import * as THREE from 'three'; 
 import styles from './overlay.module.scss'; 
 import type { IConstructed } from '../data';
+import type { GCodeSettings } from '../toolpath/morph-lines';
 
 interface IProps {
   constructed?: IConstructed,
   toolpathGroupRef: React.RefObject<THREE.Group | null>,
+  gcodeSettings: GCodeSettings,
+  onGcodeSettingsChange: React.Dispatch<React.SetStateAction<GCodeSettings>>,
+  defaultSpindleSpeed?: number,
 }
 export const Overlay = (props: IProps) => { 
   return !props.constructed ? null : <div className={styles.overlay}>
+  <PostSettings {...props} />
   <Rotation {...props} />
   <Segments {...props} /> 
   <WhatIsThisProject /> 
   <Disclaimer />
   </div>
 };
+
+const PostSettings = (props: IProps) => {
+  const { gcodeSettings, onGcodeSettingsChange, defaultSpindleSpeed } = props;
+
+  const updateWorkOffset = (value: string) => {
+    onGcodeSettingsChange(current => ({
+      ...current,
+      workOffset: value,
+    }));
+  };
+
+  const updateRetractAxis = (axis: 'x' | 'y' | 'z', rawValue: string) => {
+    onGcodeSettingsChange(current => {
+      const nextSafeRetract = { ...current.safeRetract };
+
+      if (rawValue.trim() === '') {
+        if (axis !== 'z') {
+          delete nextSafeRetract[axis];
+        }
+      } else {
+        const parsed = Number(rawValue);
+        if (!Number.isFinite(parsed)) {
+          return current;
+        }
+        nextSafeRetract[axis] = parsed;
+      }
+
+      return {
+        ...current,
+        safeRetract: nextSafeRetract,
+      };
+    });
+  };
+
+  const updateSpindleSpeed = (rawValue: string) => {
+    onGcodeSettingsChange(current => {
+      if (rawValue.trim() === '') {
+        return {
+          ...current,
+          spindleSpeed: undefined,
+        };
+      }
+
+      const parsed = Number(rawValue);
+      if (!Number.isFinite(parsed)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        spindleSpeed: parsed,
+      };
+    });
+  };
+
+  const updateMachineAction = (action: keyof GCodeSettings['machineActions'], checked: boolean) => {
+    onGcodeSettingsChange(current => ({
+      ...current,
+      machineActions: {
+        ...current.machineActions,
+        [action]: checked,
+      },
+    }));
+  };
+
+  return <details className={styles.accordion} open>
+    <summary className={styles.summary}>Post Settings</summary>
+    <div className={styles.accordionContent}>
+      <div className={styles.inputGroup}>
+        <div className={styles.inputRow}>
+          <label>Offset</label>
+          <input
+            type="text"
+            value={gcodeSettings.workOffset}
+            onChange={(e) => updateWorkOffset(e.target.value.toUpperCase())}
+            style={{ width: 96, textAlign: 'left' }}
+          />
+        </div>
+        <div style={{ fontSize: '0.85em', color: '#999' }}>
+          Use `G54`-`G59` or `G54.1 Pn`.
+        </div>
+      </div>
+
+      <div className={styles.inputGroup}>
+        <div className={styles.inputRow}>
+          <label>RPM</label>
+          <input
+            type="number"
+            step="1"
+            min="1"
+            value={gcodeSettings.spindleSpeed ?? ''}
+            placeholder={defaultSpindleSpeed === undefined ? 'required' : String(defaultSpindleSpeed)}
+            onChange={(e) => updateSpindleSpeed(e.target.value)}
+          />
+        </div>
+        <div style={{ fontSize: '0.85em', color: '#999' }}>
+          {defaultSpindleSpeed === undefined
+            ? 'No bit/material default RPM is defined. Enter an explicit spindle speed to allow G-code export.'
+            : `Leave blank to use the bit/material default of ${defaultSpindleSpeed} RPM.`}
+        </div>
+      </div>
+
+      <div className={styles.inputGroup}>
+        <div style={{ marginBottom: 6, fontWeight: 700, color: '#ddd' }}>Safe Retract</div>
+        <div className={styles.inputRow}>
+          <label>X</label>
+          <input
+            type="number"
+            step="0.001"
+            value={gcodeSettings.safeRetract.x ?? ''}
+            placeholder="keep"
+            onChange={(e) => updateRetractAxis('x', e.target.value)}
+          />
+          <label>Y</label>
+          <input
+            type="number"
+            step="0.001"
+            value={gcodeSettings.safeRetract.y ?? ''}
+            placeholder="keep"
+            onChange={(e) => updateRetractAxis('y', e.target.value)}
+          />
+          <label>Z</label>
+          <input
+            type="number"
+            step="0.001"
+            value={gcodeSettings.safeRetract.z}
+            onChange={(e) => updateRetractAxis('z', e.target.value)}
+          />
+        </div>
+        <div style={{ fontSize: '0.85em', color: '#999' }}>
+          X/Y are optional park coordinates for rotary-safe retracts. Z is the required clearance height.
+        </div>
+      </div>
+
+      <div className={styles.inputGroup}>
+        <div style={{ marginBottom: 6, fontWeight: 700, color: '#ddd' }}>Machine Actions</div>
+        <div className={styles.inputRow}>
+          <label>
+            <input
+              type="checkbox"
+              checked={gcodeSettings.machineActions.homeZBeforeStart}
+              onChange={(e) => updateMachineAction('homeZBeforeStart', e.target.checked)}
+            />
+            &nbsp;Home Z before start
+          </label>
+        </div>
+        <div className={styles.inputRow}>
+          <label>
+            <input
+              type="checkbox"
+              checked={gcodeSettings.machineActions.homeZAfterEnd}
+              onChange={(e) => updateMachineAction('homeZAfterEnd', e.target.checked)}
+            />
+            &nbsp;Home Z after end
+          </label>
+        </div>
+        <div className={styles.inputRow}>
+          <label>
+            <input
+              type="checkbox"
+              checked={gcodeSettings.machineActions.homeXYAfterEnd}
+              onChange={(e) => updateMachineAction('homeXYAfterEnd', e.target.checked)}
+            />
+            &nbsp;Home X/Y after end
+          </label>
+        </div>
+        <div className={styles.inputRow}>
+          <label>
+            <input
+              type="checkbox"
+              checked={gcodeSettings.machineActions.resetRotaryAfterEnd}
+              onChange={(e) => updateMachineAction('resetRotaryAfterEnd', e.target.checked)}
+            />
+            &nbsp;Reset A to zero after end
+          </label>
+        </div>
+        <div style={{ fontSize: '0.85em', color: '#999' }}>
+          These defaults match your machine's post behavior, but they remain editable here for prove-out and recovery workflows.
+        </div>
+      </div>
+    </div>
+  </details>
+}
 
 const Segments = (props: IProps) => { 
   const [segments, setsegments] = React.useState<PointXYZ[][]>([]);

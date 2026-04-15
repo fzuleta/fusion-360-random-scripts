@@ -7,6 +7,9 @@ import { models, type IConstructed, type IConstruction } from './data';
 import { degToRad, isNumeric, range } from './helpers';
 import { bitCatalog, getBitKey, getBitMaterials } from './helpers/carbide-bits';
 import {
+  DEFAULT_GCODE_SETTINGS,
+  type GCodeSettings,
+  buildMachinePreviewPath,
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
 import { Overlay } from './components/overlay'; 
@@ -23,6 +26,9 @@ function App() {
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IConstruction | undefined>(undefined);
   const [constructed, setConstructed] = React.useState<IConstructed | undefined>(undefined);
+  const [showMachinePreview, setShowMachinePreview] = React.useState(false);
+  const [gcodeSettings, setGcodeSettings] = React.useState<GCodeSettings>(DEFAULT_GCODE_SETTINGS);
+  const [debouncedGcodeSettings, setDebouncedGcodeSettings] = React.useState<GCodeSettings>(DEFAULT_GCODE_SETTINGS);
   // const [lines, setLines] = React.useState<ILinesGotten>();
   const feedRateRef = React.useRef(120);
   const bitMeshRef = React.useRef<THREE.Mesh>(null);
@@ -45,6 +51,22 @@ function App() {
     () => (selectedBit ? getBitMaterials(selectedBit) : []),
     [selectedBit]
   );
+  const resolvedMaterial = React.useMemo(() => {
+    if (!availableMaterials.length) { return undefined; }
+    return availableMaterials.includes(material) ? material : availableMaterials[0];
+  }, [availableMaterials, material]);
+  const defaultSpindleSpeed = React.useMemo(() => {
+    if (!selectedBit || !resolvedMaterial) { return undefined; }
+    return selectedBit.material[resolvedMaterial]?.spindleSpeed;
+  }, [resolvedMaterial, selectedBit]);
+
+  React.useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedGcodeSettings(gcodeSettings);
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [gcodeSettings]);
 
   const draw = () => {
     if (!sceneRef.current) return; 
@@ -59,6 +81,14 @@ function App() {
     loadMesh();
     loadStock();
     const animBit = (path: TVector3[]) => {
+      if (path.length < 2) {
+        pathRef.current = path;
+        if (path[0]) {
+          bitMeshRef.current?.position.copy(path[0]);
+        }
+        return;
+      }
+
       // reset & alias shared state for this new path
       wheelStateRef.current.i = 0;
       wheelStateRef.current.t = 0;
@@ -71,46 +101,85 @@ function App() {
         // elapsed time
         const dt = Math.min(clock.getDelta(), 0.1); // cap to 100ms
 
-        // ── Skip any zero‑length segments (duplicate points) ────────────
         const n = path.length;
-        // while (
-        //   wheelState.i < n - 1 &&
-        //   path[wheelState.i].equals(path[(wheelState.i + 1) % n])
-        // ) {
-          // wheelState.i++;
-        // }
+        const lastIndex = n - 1;
+        const clampIndex = (index: number) => Math.min(Math.max(index, 0), lastIndex);
+        const nextIndex = (index: number) => Math.min(index + 1, lastIndex);
 
-        const p0 = path[wheelState.i];
-        const p1 = path[(wheelState.i + 1) % n];
-        const segLen = p0.distanceTo(p1);
+        wheelState.i = clampIndex(wheelState.i);
 
-        // If after skipping dupes we still have a zero‑length segment,
-        // just bail for this frame.
-        if (segLen === 0) return;
+        if (wheelState.i >= lastIndex) {
+          wheelState.i = lastIndex;
+          wheelState.t = 0;
+          bitMeshRef.current?.position.copy(path[lastIndex]);
+          if (!isScrubbingRef.current) {
+            setScrub(100);
+          }
+          return;
+        }
+
+        while (wheelState.i < lastIndex && path[wheelState.i].equals(path[nextIndex(wheelState.i)])) {
+          wheelState.i++;
+        }
+
+        if (wheelState.i >= lastIndex) {
+          wheelState.i = lastIndex;
+          wheelState.t = 0;
+          bitMeshRef.current?.position.copy(path[lastIndex]);
+          if (!isScrubbingRef.current) {
+            setScrub(100);
+          }
+          return;
+        }
+
+        let p0 = path[wheelState.i];
+        let p1 = path[nextIndex(wheelState.i)];
+        let segLen = p0.distanceTo(p1);
+
+        if (segLen === 0) {
+          return;
+        }
 
         const feed = p0.isCut ? (feedRateRef.current / 60) : 10; // convert mm/min → mm/sec
         const dFrac = (feed * dt) / segLen;
         wheelState.t += dFrac;
 
-        // Walk forward through as many nodes as we overshoot
-        while (wheelState.t >= 1) {
+        let guard = 0;
+        while (wheelState.t >= 1 && guard < n) {
+          guard++;
           wheelState.t -= 1;
-          wheelState.i = (wheelState.i + 1) % n;
+          wheelState.i = nextIndex(wheelState.i);
 
-          // Skip any further zero‑length segments
-          while (
-            wheelState.i < n - 1 &&
-            path[wheelState.i].equals(path[(wheelState.i + 1) % n])
-          ) {
+          if (wheelState.i >= lastIndex) {
+            wheelState.i = lastIndex;
+            wheelState.t = 0;
+            bitMeshRef.current?.position.copy(path[lastIndex]);
+            if (!isScrubbingRef.current) {
+              setScrub(100);
+            }
+            return;
+          }
+
+          while (wheelState.i < lastIndex && path[wheelState.i].equals(path[nextIndex(wheelState.i)])) {
             wheelState.i++;
+          }
+
+          if (wheelState.i >= lastIndex) {
+            wheelState.i = lastIndex;
+            wheelState.t = 0;
+            bitMeshRef.current?.position.copy(path[lastIndex]);
+            if (!isScrubbingRef.current) {
+              setScrub(100);
+            }
+            return;
           }
         }
 
         // Re-fetch endpoints after potential advance
-        const a = path[wheelState.i];
-        const b = path[(wheelState.i + 1) % n];
+        p0 = path[wheelState.i];
+        p1 = path[nextIndex(wheelState.i)];
 
-        bitMeshRef.current?.position.lerpVectors(a, b, wheelState.t);
+        bitMeshRef.current?.position.lerpVectors(p0, p1, wheelState.t);
         // ── Reflect playback on the slider (if not actively scrubbing) ──
         if (!isScrubbingRef.current && n > 1) {
           const progress = ((wheelState.i + wheelState.t) / (n - 1)) * 100;
@@ -120,7 +189,16 @@ function App() {
     }
     if (!constructed) { return console.error('no constructed'); }
     if (constructed.segmentsForThreeJs && constructed.segmentsForThreeJs.length) {
-      const path: TVector3[] = constructed.segmentsForThreeJs;
+      const conceptualPath: TVector3[] = constructed.segmentsForThreeJs;
+      const machinePath: TVector3[] = constructed.segmentsForGcodeFitted?.length
+        ? buildMachinePreviewPath({
+            segments: constructed.segmentsForGcodeFitted,
+            rotation: constructed.rotation,
+            safeRetract: debouncedGcodeSettings.safeRetract,
+            arcRes: 0.01,
+          })
+        : conceptualPath;
+      const path: TVector3[] = showMachinePreview ? machinePath : conceptualPath;
       pathRef.current = path;
 
       // build geometry
@@ -151,7 +229,9 @@ function App() {
       const line = new THREE.Line(geo, mat);
       toolpathGroupRef.current.add(line);
 
-      drawRotaryVisual(constructed.originalLines, constructed.rotation);
+      if (!showMachinePreview) {
+        drawRotaryVisual(constructed.originalLines, constructed.rotation);
+      }
 
       animBit(path);
       return;
@@ -202,16 +282,8 @@ function App() {
     if (!rotation) { return; }
     const segments: TVector3[] = [];
 
-    // Build rotarySegments from the first two original lines
-    // const lines0 = originalLines?.[0] ?? [];
     const lines1 = originalLines?.[1] ?? [];
 
-    // for (let i = 0; i < lines0.length - 1; i++) {
-    //   const a = lines0[i];
-    //   const b = lines0[i + 1];
-    //   segments.push(new THREE.Vector3(a.x, a.y, a.z ?? 0));
-    //   segments.push(new THREE.Vector3(b.x, b.y, b.z ?? 0));
-    // }
     for (let i = 0; i < lines1.length - 1; i++) {
       const a = lines1[i];
       const b = lines1[i + 1];
@@ -353,31 +425,32 @@ function App() {
     }
   }, [modelBit, passNum]);
   React.useEffect(() => {
-    if (!availableMaterials.length) { return; }
-    if (!availableMaterials.includes(material)) {
-      setMaterial(availableMaterials[0]);
+    if (!resolvedMaterial) { return; }
+    if (material !== resolvedMaterial) {
+      setMaterial(resolvedMaterial);
       return;
     }
-    const bitMaterial = selectedBit?.material[material];
+    const bitMaterial = selectedBit?.material[resolvedMaterial];
     if (!bitMaterial) { return; }
     setStepOver(bitMaterial.stepOver);
     setFeedRate(bitMaterial.feedRate);
     if (!pass || !selectedBit) { return; }
-    setConstructed(pass.construct({ bit: selectedBit, material, stockRadius }));
-  }, [availableMaterials, material, pass, selectedBit, stockRadius]);
+    setConstructed(pass.construct({ bit: selectedBit, material: resolvedMaterial, stockRadius }));
+  }, [material, pass, resolvedMaterial, selectedBit, stockRadius]);
   React.useEffect(() => {
-    if (!sceneRef.current || !pass || !selectedBit) return;
+    if (!sceneRef.current || !pass || !selectedBit || !resolvedMaterial) return;
     const bit: IBit = JSON.parse(JSON.stringify(selectedBit));
-    bit.material[material]!.feedRate = feedRate;
-    bit.material[material]!.stepOver = stepOver;
-    const newConstructed = pass.construct({ bit, material, stockRadius })
+    if (!bit.material[resolvedMaterial]) return;
+    bit.material[resolvedMaterial]!.feedRate = feedRate;
+    bit.material[resolvedMaterial]!.stepOver = stepOver;
+    const newConstructed = pass.construct({ bit, material: resolvedMaterial, stockRadius })
     setConstructed(newConstructed);
-  }, [feedRate, stepOver, stockRadius, pass, material, selectedBit]);  
+  }, [feedRate, stepOver, stockRadius, pass, resolvedMaterial, selectedBit]);  
   React.useEffect(() => {
     console.log("Changing constructed to: ", constructed)
     if (!sceneRef.current || !pass || !constructed) return;
     drawRef.current();
-  }, [constructed, pass]);
+  }, [constructed, debouncedGcodeSettings, pass, showMachinePreview]);
   React.useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -483,14 +556,22 @@ function App() {
 
   /** Download the current pass as G‑code (.nc) */
   const handleDownloadGcode = () => { 
-    if (!pass || !constructed) return;
+    if (!pass || !constructed || !resolvedMaterial) return;
 
-    const gcodeLines = generateGCodeFromSegments({
-      material,
-      segments: constructed.segmentsForGcodeFitted,
-      bit: constructed.bit,
-      rotation: constructed.rotation,
-    });
+    let gcodeLines: string[];
+    try {
+      gcodeLines = generateGCodeFromSegments({
+        material: resolvedMaterial,
+        segments: constructed.segmentsForGcodeFitted,
+        bit: constructed.bit,
+        rotation: constructed.rotation,
+        settings: gcodeSettings,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate G-code';
+      window.alert(message);
+      return;
+    }
 
     const blob = new Blob([gcodeLines.join('\n')], { type: 'text/plain' });
     const url  = URL.createObjectURL(blob);
@@ -535,7 +616,7 @@ return (
         <label>
           Material:
           <select
-            value={material}
+            value={resolvedMaterial ?? ''}
             onChange={(e) => setMaterial(e.target.value as TMaterial)}
           >
             {availableMaterials.map((materialOption) => (
@@ -608,6 +689,14 @@ return (
         <button style={{ marginLeft: 8 }} onClick={handleDownloadGcode}>
           ⬇︎&nbsp;Download&nbsp;G‑code
         </button>
+        <label style={{ marginLeft: 12 }}>
+          <input
+            type="checkbox"
+            checked={showMachinePreview}
+            onChange={(e) => setShowMachinePreview(e.target.checked)}
+          />
+          &nbsp;Exact machine preview
+        </label>
       </div>
       {/* full‑width scrub slider on its own line */}
       <div style={{ width: '100%', marginTop: 4, display: 'flex' }}>
@@ -634,7 +723,13 @@ return (
       </div>
       
     </div>
-    <Overlay constructed={ constructed } toolpathGroupRef={toolpathGroupRef} />
+    <Overlay
+      constructed={constructed}
+      toolpathGroupRef={toolpathGroupRef}
+      gcodeSettings={gcodeSettings}
+      onGcodeSettingsChange={setGcodeSettings}
+      defaultSpindleSpeed={defaultSpindleSpeed}
+    />
     <div ref={mountRef} className={styles.canvas} />
   </div>
 )
