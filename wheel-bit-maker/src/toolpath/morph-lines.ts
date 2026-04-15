@@ -299,6 +299,7 @@ export function generateGCodeFromSegments(props: {
     `G43 Z30.0 H${bit.toolNumber}`, // length offset + safe height
   ];
   const safeRetractZ = 30.0;
+  const approachOffsetZ = 1.0;
 
   // Pre-position XY at safe Z to the very first commanded point
   const firstPtSeg = segments.find(s => s.pts.length > 0);
@@ -323,6 +324,9 @@ export function generateGCodeFromSegments(props: {
   const isSamePoint = (a: PointXYZ, b: PointXYZ) =>
     a.x === b.x && a.y === b.y && a.z === b.z;
 
+  const isSameXY = (a: PointXYZ, b: PointXYZ) =>
+    a.x === b.x && a.y === b.y;
+
   const pushG0 = (p: PointXYZ) => {
     if (lastMotionPoint && isSamePoint(lastMotionPoint, p)) return;
     gcode.push(`G0 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}`);
@@ -346,6 +350,19 @@ export function generateGCodeFromSegments(props: {
     lastMotionPoint = { ...lastMotionPoint, z: safeRetractZ };
   };
 
+  const prepareForFeedMove = (target: PointXYZ) => {
+    if (!lastMotionPoint) return;
+    const approachZ = Math.min(safeRetractZ, target.z + approachOffsetZ);
+
+    if (!isSameXY(lastMotionPoint, target)) {
+      pushG0({ x: target.x, y: target.y, z: lastMotionPoint.z });
+    }
+
+    if (lastMotionPoint.z > approachZ) {
+      pushG0({ x: target.x, y: target.y, z: approachZ });
+    }
+  };
+
   const emitSeg = (seg: ToolpathSegment) => {
     switch (seg.kind) {
       case 'rapid':
@@ -353,7 +370,11 @@ export function generateGCodeFromSegments(props: {
         seg.pts.forEach(pushG0);
         break;
       case 'plunge':
+        prepareForFeedMove(seg.pts[0]);
+        seg.pts.forEach(p => pushG1(p, seg.feed));
+        break;
       case 'cut':
+        prepareForFeedMove(seg.pts[0]);
         seg.pts.forEach(p => pushG1(p, seg.feed));
         break;
       // case 'arc': {

@@ -1,4 +1,3 @@
-
 export const bit1mm: IBit = {
   diameter: 1, 
   height: 10, 
@@ -74,6 +73,23 @@ export const bit3_175mm_4_flute_chino: IBit = {
     }
   }
 }
+export const bit3_175mm_3_flute_aluminum: IBit = {
+  diameter: 3.175, 
+  height: 10, 
+  toolNumber: 4,  
+  material: {
+    'brass-Rough': {
+      spindleSpeed: 11000,
+      feedRate: 800,
+      stepOver: 0.5,
+    },
+    'brass-Finish': {
+      spindleSpeed: 11000,
+      feedRate: 450,
+      stepOver: 0.1,
+    }
+  }
+}
 export const bit6_35mm_4_flute_chino: IBit = {
   diameter: 6.35,
   height: 10, 
@@ -93,6 +109,7 @@ export const bitCatalog: Array<{ key: string; label: string; bit: IBit }> = [
   { key: 'bit3_175mm_2_flute', label: '3.175 mm 2 flute', bit: bit3_175mm_2_flute },
   { key: 'bit3_175mm_4_flute_harveyTool', label: '3.175 mm 4 flute Harvey Tool', bit: bit3_175mm_4_flute_harveyTool },
   { key: 'bit3_175mm_4_flute_chino', label: '3.175 mm 4 flute Chino', bit: bit3_175mm_4_flute_chino },
+  { key: 'bit3_175mm_3_flute_aluminum', label: '3.175 mm 3 flute Aluminum', bit: bit3_175mm_3_flute_aluminum },
   { key: 'bit6_35mm_4_flute_chino', label: '6.35 mm 4 flute Chino', bit: bit6_35mm_4_flute_chino },
 ];
 
@@ -103,4 +120,3 @@ export const getBitKey = (bit: IBit): string | undefined => {
 export const getBitMaterials = (bit: IBit): TMaterial[] => {
   return Object.keys(bit.material) as TMaterial[];
 };
-

@@ -41,7 +41,10 @@ function App() {
   // Animation pause state
   const isAnimationPausedRef = React.useRef(false);
   const selectedBit = bitCatalog.find((bitOption) => bitOption.key === selectedBitKey)?.bit ?? pass?.defaultBit;
-  const availableMaterials = selectedBit ? getBitMaterials(selectedBit) : [];
+  const availableMaterials = React.useMemo(
+    () => (selectedBit ? getBitMaterials(selectedBit) : []),
+    [selectedBit]
+  );
 
   const draw = () => {
     if (!sceneRef.current) return; 
@@ -361,7 +364,7 @@ function App() {
     setFeedRate(bitMaterial.feedRate);
     if (!pass || !selectedBit) { return; }
     setConstructed(pass.construct({ bit: selectedBit, material, stockRadius }));
-  }, [material, pass, selectedBit, stockRadius]);
+  }, [availableMaterials, material, pass, selectedBit, stockRadius]);
   React.useEffect(() => {
     if (!sceneRef.current || !pass || !selectedBit) return;
     const bit: IBit = JSON.parse(JSON.stringify(selectedBit));
