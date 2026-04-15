@@ -9,6 +9,7 @@ interface IProps {
   toolpathGroupRef: React.RefObject<THREE.Group | null>,
   gcodeSettings: GCodeSettings,
   onGcodeSettingsChange: React.Dispatch<React.SetStateAction<GCodeSettings>>,
+  defaultToolNumber?: number,
   defaultSpindleSpeed?: number,
 }
 export const Overlay = (props: IProps) => { 
@@ -22,7 +23,7 @@ export const Overlay = (props: IProps) => {
 };
 
 const PostSettings = (props: IProps) => {
-  const { gcodeSettings, onGcodeSettingsChange, defaultSpindleSpeed } = props;
+  const { gcodeSettings, onGcodeSettingsChange, defaultToolNumber, defaultSpindleSpeed } = props;
 
   const updateWorkOffset = (value: string) => {
     onGcodeSettingsChange(current => ({
@@ -75,6 +76,27 @@ const PostSettings = (props: IProps) => {
     });
   };
 
+  const updateToolNumber = (rawValue: string) => {
+    onGcodeSettingsChange(current => {
+      if (rawValue.trim() === '') {
+        return {
+          ...current,
+          toolNumber: undefined,
+        };
+      }
+
+      const parsed = Number(rawValue);
+      if (!Number.isFinite(parsed)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        toolNumber: Math.trunc(parsed),
+      };
+    });
+  };
+
   const updateMachineAction = (action: keyof GCodeSettings['machineActions'], checked: boolean) => {
     onGcodeSettingsChange(current => ({
       ...current,
@@ -100,6 +122,25 @@ const PostSettings = (props: IProps) => {
         </div>
         <div style={{ fontSize: '0.85em', color: '#999' }}>
           Use `G54`-`G59` or `G54.1 Pn`.
+        </div>
+      </div>
+
+      <div className={styles.inputGroup}>
+        <div className={styles.inputRow}>
+          <label>Tool</label>
+          <input
+            type="number"
+            step="1"
+            min="1"
+            value={gcodeSettings.toolNumber ?? ''}
+            placeholder={defaultToolNumber === undefined ? 'required' : String(defaultToolNumber)}
+            onChange={(e) => updateToolNumber(e.target.value)}
+          />
+        </div>
+        <div style={{ fontSize: '0.85em', color: '#999' }}>
+          {defaultToolNumber === undefined
+            ? 'No default tool number is defined. Enter a tool number here to allow G-code export.'
+            : `Leave blank to use the current bit default of T${defaultToolNumber}.`}
         </div>
       </div>
 

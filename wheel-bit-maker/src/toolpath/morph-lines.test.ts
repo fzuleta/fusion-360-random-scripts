@@ -57,9 +57,8 @@ describe('generateGCodeFromSegments', () => {
       'G04 P1.0',
       'M8',
       'G54',
-      'G43 Z30.0 H7',
+      'G43 Z0.0 H7',
       'G0 X0.000 Y0.000 ; pre-position XY at safe Z',
-      'G0 X0.000 Y0.000 Z0.000',
       'G1 X0.000 Y0.000 Z-1.000 F100',
       'G1 X2.000 Y0.000 Z-1.000 F250',
       'M9',
@@ -99,9 +98,8 @@ describe('generateGCodeFromSegments', () => {
       'G04 P1.0',
       'M8',
       'G54',
-      'G43 Z30.0 H7',
+      'G43 Z0.0 H7',
       'G0 X0.000 Y0.000 ; pre-position XY at safe Z',
-      'G0 X0.000 Y0.000 Z0.000',
       'G1 X0.000 Y0.000 Z-1.000 F100',
       'G1 X2.000 Y0.000 Z-1.000 F250',
       'M9',
@@ -138,6 +136,34 @@ describe('generateGCodeFromSegments', () => {
         safeRetract: { z: 30, y: Number.POSITIVE_INFINITY },
       },
     })).toThrow(/safe retract Y must be a finite number/);
+  });
+
+  it('uses the post tool-number override when provided', () => {
+    const gcode = generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: makeBit(12000),
+      segments: baseSegments,
+      settings: {
+        ...DEFAULT_GCODE_SETTINGS,
+        toolNumber: 12,
+      },
+    });
+
+    expect(gcode).toContain('( TOOL 12  Ø3.175 CVD-DIA )');
+    expect(gcode).toContain('T12 M6');
+    expect(gcode).toContain('G43 Z0.0 H12');
+  });
+
+  it('throws when the post tool-number override is invalid', () => {
+    expect(() => generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: makeBit(12000),
+      segments: baseSegments,
+      settings: {
+        ...DEFAULT_GCODE_SETTINGS,
+        toolNumber: 0,
+      },
+    })).toThrow(/Tool number must be a positive integer/);
   });
 
   it('only resets rotary after end when configured on a rotary job', () => {

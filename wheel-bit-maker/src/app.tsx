@@ -59,6 +59,7 @@ function App() {
     if (!selectedBit || !resolvedMaterial) { return undefined; }
     return selectedBit.material[resolvedMaterial]?.spindleSpeed;
   }, [resolvedMaterial, selectedBit]);
+  const defaultToolNumber = React.useMemo(() => selectedBit?.toolNumber, [selectedBit]);
 
   React.useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -728,6 +729,7 @@ return (
       toolpathGroupRef={toolpathGroupRef}
       gcodeSettings={gcodeSettings}
       onGcodeSettingsChange={setGcodeSettings}
+      defaultToolNumber={defaultToolNumber}
       defaultSpindleSpeed={defaultSpindleSpeed}
     />
     <div ref={mountRef} className={styles.canvas} />

@@ -33,6 +33,7 @@ export interface MachineActionSettings {
 
 export interface GCodeSettings {
   workOffset: string;
+  toolNumber?: number;
   spindleSpeed?: number;
   safeRetract: {
     x?: number;
@@ -327,6 +328,13 @@ export function generateGCodeFromSegments(props: {
     throw new Error('Spindle speed is required. Set an RPM in Post Settings or define one on the selected bit/material.');
   }
   const spindleSpeed = Math.round(settings?.spindleSpeed ?? materialSpindleSpeed ?? 0);
+  if (settings?.toolNumber !== undefined && (!Number.isFinite(settings.toolNumber) || !Number.isInteger(settings.toolNumber) || settings.toolNumber <= 0)) {
+    throw new Error(`Tool number must be a positive integer, got ${settings.toolNumber}`);
+  }
+  const toolNumber = Math.trunc(settings?.toolNumber ?? bit.toolNumber);
+  if (!Number.isFinite(toolNumber) || toolNumber <= 0) {
+    throw new Error(`Tool number must be a positive integer, got ${toolNumber}`);
+  }
   const workOffset = normalizeWorkOffset(settings?.workOffset ?? DEFAULT_GCODE_SETTINGS.workOffset);
   if (!isValidWorkOffset(workOffset)) {
     throw new Error(`Unsupported work offset: ${workOffset}. Use G54-G59 or G54.1 Pn.`);
@@ -352,13 +360,13 @@ export function generateGCodeFromSegments(props: {
   const gcode: string[] = [
     'G90 G94 G91.1 G40 G49 G17', // abs, mm/min, IJ inc, cancel comp, XY plane
     'G21',                       // metric
-    `( TOOL ${bit.toolNumber}  Ø${bit.diameter.toFixed(3)} CVD-DIA )`,
-    `T${bit.toolNumber} M6`,
+    `( TOOL ${toolNumber}  Ø${bit.diameter.toFixed(3)} CVD-DIA )`,
+    `T${toolNumber} M6`,
     `S${spindleSpeed} M3`,
     'G04 P1.0' ,                // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
     'M8',                       // air / coolant on
     workOffset,                 // work offset
-    `G43 Z${safeRetract.z.toFixed(1)} H${bit.toolNumber}`, // length offset + safe height
+    `G43 Z${safeRetract.z.toFixed(1)} H${toolNumber}`, // length offset + safe height
   ];
   if (machineActions.homeZBeforeStart) {
     gcode.splice(2, 0, 'G28 G91 Z0.', 'G90');
