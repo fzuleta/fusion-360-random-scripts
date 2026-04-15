@@ -115,9 +115,10 @@ const pass1 = (): IConstruction => {
         { x: -3, y: 0.7, z }, 
       ];
 
-  const applyBitRadiusAndStockRadius = (bitRadius: number, _: number) => {
+  const applyBitRadiusAndStockRadius = (bitRadius: number, stockRadius: number) => {
     const lA = JSON.parse(JSON.stringify(lineA));
     const lB = JSON.parse(JSON.stringify(lineB)); 
+    void stockRadius;
 
     lA.forEach((it: any) => it.y += bitRadius);
 
@@ -189,9 +190,10 @@ const pass2 = (): IConstruction => {
     { x: -5.0, y: 0.7, z }
   ]; 
 
-  const applyBitRadiusAndStockRadius = (bitRadius: number, _: number) => {
+  const applyBitRadiusAndStockRadius = (bitRadius: number, stockRadius: number) => {
     const lA = JSON.parse(JSON.stringify(lineA));
     const lB = JSON.parse(JSON.stringify(lineB)); 
+    void stockRadius;
 
     lA.forEach((it: any) => {
       it.x += bitRadius;
@@ -264,9 +266,10 @@ const pass3 = (): IConstruction => {
     { x: 2,  y: -1.5,   z },
   ];
 
-  const applyBitRadiusAndStockRadius = (bitRadius: number, _: number) => {
+  const applyBitRadiusAndStockRadius = (bitRadius: number, stockRadius: number) => {
     const lA = JSON.parse(JSON.stringify(lineA));
     const lB = JSON.parse(JSON.stringify(lineB)); 
+    void stockRadius;
 
     lA.forEach((it: any) => { 
       it.y -= bitRadius;
@@ -316,7 +319,7 @@ const pass3 = (): IConstruction => {
   }
 } 
 const pass4 = (): IConstruction => { 
-  const bit = bits.bit3_175mm_4_flute_harveyTool; 
+  const bit = bits.bit3_175mm_4_flute_chino; 
   const bottomCut = -0.6
 
   const _points: Segment[] = [

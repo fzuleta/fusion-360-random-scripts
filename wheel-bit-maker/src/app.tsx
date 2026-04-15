@@ -10,15 +10,22 @@ import {
 } from './toolpath/morph-lines';
 import { Overlay } from './components/overlay'; 
 
-type Material = 'brass' | 'A2' | '316L';
+const MATERIAL_OPTIONS: TMaterial[] = [
+  'brass-Rough',
+  'brass-Finish',
+  'A2-Rough',
+  'A2-Finish',
+  '316L',
+  'carbide',
+];
 
 function App() {
-  const [otherThingsToRender, setOtherThingsToRender] = React.useState<{[k: string]: () => unknown}>({});
+  const otherThingsToRenderRef = React.useRef<{[k: string]: () => unknown}>({});
   const [passNum, setPassNum] = React.useState(0);
   // Feed‑rate in mm/min (20 = very slow, 200 = nominal)
   const [feedRate, setFeedRate] = React.useState(2000);
   const [stepOver, setStepOver] = React.useState(0.2); 
-  const [material, setMaterial] = React.useState<Material>('A2');
+  const [material, setMaterial] = React.useState<TMaterial>('A2-Rough');
   const [stockRadius, setStockRadius] = React.useState(6 * 0.5); // ((3/8) * 25.4) / 2); // 6 / 2);
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IConstruction | undefined>(undefined);
@@ -30,7 +37,8 @@ function App() {
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
   const toolpathGroupRef = React.useRef<THREE.Group | null>(null); 
   const orbitControlsRef = React.useRef<OrbitControls | undefined>(undefined);
-  const [_renderer, setRenderer] = React.useState<THREE.WebGLRenderer>();
+  const animationFrameRef = React.useRef<number | null>(null);
+  const drawRef = React.useRef<() => void>(() => {});
 
   const [scrub, setScrub] = React.useState(0);            // 0‑100 %
   const isScrubbingRef = React.useRef(false);
@@ -59,7 +67,7 @@ function App() {
       const wheelState = wheelStateRef.current;
       const clock = new THREE.Clock();
 
-      const other = otherThingsToRender;
+      const other = otherThingsToRenderRef.current;
       other['tooth'] = () => {
         if (isScrubbingRef.current || isAnimationPausedRef.current) return;   // freeze while slider is held or animation is paused
         // elapsed time
@@ -111,7 +119,6 @@ function App() {
           setScrub(progress);
         }
       };
-      setOtherThingsToRender(other);
     }
     if (!constructed) { return console.error('no constructed'); }
     if (constructed.segmentsForThreeJs && constructed.segmentsForThreeJs.length) {
@@ -152,6 +159,8 @@ function App() {
       return;
     }
   }
+  drawRef.current = draw;
+
   function loadStock() {
     if (!toolpathGroupRef.current) return;
 
@@ -177,7 +186,7 @@ function App() {
     const lineTop = new THREE.LineLoop(geoTop, mat);
     const lineBottom = new THREE.LineLoop(geoBottom, mat);
 
-    const topToBottomLines = pointsTop.map((pt, _) => {
+    const topToBottomLines = pointsTop.map((pt) => {
       return new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(0, pt.y, pt.z),
@@ -330,7 +339,7 @@ function App() {
 
   React.useEffect(() => {
     setPassNum(0);
-    setMaterial('A2');
+    setMaterial('A2-Rough');
   }, [modelBit]);
 
 
@@ -347,20 +356,20 @@ function App() {
     setConstructed(() => {
       return constructed;
     });
-  }, [passNum, material, stockRadius]); 
+  }, [modelBit, passNum, material, stockRadius]); 
   React.useEffect(() => {
-    if (!sceneRef.current || !pass || !constructed) return;
-    const bit: IBit = JSON.parse(JSON.stringify(constructed.bit));
+    if (!sceneRef.current || !pass) return;
+    const bit: IBit = JSON.parse(JSON.stringify(pass.defaultBit));
     bit.material[material]!.feedRate = feedRate;
     bit.material[material]!.stepOver = stepOver;
     const newConstructed = pass.construct({ bit, material, stockRadius })
     setConstructed(newConstructed);
-  }, [feedRate, stepOver, stockRadius]);  
+  }, [feedRate, stepOver, stockRadius, pass, material]);  
   React.useEffect(() => {
     console.log("Changing constructed to: ", constructed)
     if (!sceneRef.current || !pass || !constructed) return;
-    draw();
-  }, [constructed]);
+    drawRef.current();
+  }, [constructed, pass]);
   React.useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -394,7 +403,6 @@ function App() {
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(mount.clientWidth, mount.clientHeight)
     mount.appendChild(renderer.domElement)
-    setRenderer(renderer);
     
     const controls = new OrbitControls(camera, renderer.domElement)
     orbitControlsRef.current = controls;
@@ -421,16 +429,23 @@ function App() {
     sceneRef.current.add(axesHelper)
 
     const animate = () => {
-      requestAnimationFrame(animate)
+      animationFrameRef.current = requestAnimationFrame(animate)
       controls.update()
-      Object.keys(otherThingsToRender).forEach(k => otherThingsToRender[k]())
+      Object.values(otherThingsToRenderRef.current).forEach(fn => fn())
       renderer.render(sceneRef.current!, camera)
     }
     animate()
 
-    draw();
+    drawRef.current();
     return () => {
-      mount.removeChild(renderer.domElement)
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      controls.dispose();
+      renderer.dispose();
+      if (mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement)
+      }
     }
   }, []);
 
@@ -501,12 +516,11 @@ return (
           Material:
           <select
             value={material}
-            onChange={(e) => setMaterial(e.target.value as Material)}
+            onChange={(e) => setMaterial(e.target.value as TMaterial)}
           >
-            {/* <option value="brass">brass</option> */}
-            <option value="A2">A2</option>
-            {/* <option value="316L">316L</option> */}
-            {/* <option value="316L">carbide</option> */}
+            {MATERIAL_OPTIONS.map((materialOption) => (
+              <option key={materialOption} value={materialOption}>{materialOption}</option>
+            ))}
           </select>
         </label>
 

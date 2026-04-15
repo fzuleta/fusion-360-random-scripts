@@ -229,9 +229,43 @@ export function densifyPath(
  */
 export function pathToSegments(
   path: TVector3[],
-  opts?: { baseFeed?: number; stepOverMM?: number; minFeedFrac?: number }
+  opts?: { baseFeed?: number; plungeFeed?: number; stepOverMM?: number; minFeedFrac?: number }
 ): ToolpathSegment[] {
-  const baseFeed    = opts?.baseFeed; 
+  const baseFeed = opts?.baseFeed;
+  const plungeFeed = opts?.plungeFeed ?? (baseFeed === undefined ? undefined : Math.max(1, baseFeed * 0.4));
+  const eps = 1e-9;
+
+  const sameXY = (a: PointXYZ, b: PointXYZ) =>
+    Math.abs(a.x - b.x) <= eps && Math.abs(a.y - b.y) <= eps;
+
+  const pushSegment = (kind: ToolpathSegment['kind'], from: PointXYZ, to: PointXYZ, feed?: number) => {
+    if (
+      Math.abs(from.x - to.x) <= eps &&
+      Math.abs(from.y - to.y) <= eps &&
+      Math.abs(from.z - to.z) <= eps
+    ) {
+      return;
+    }
+
+    const seg: ToolpathSegment = {
+      kind,
+      pts: [from, to],
+    };
+
+    if (feed !== undefined && (kind === 'cut' || kind === 'plunge')) {
+      seg.feed = Math.max(1, feed);
+    }
+
+    segs.push(seg);
+  };
+
+  const clonePoint = (p: THREE.Vector3): PointXYZ => ({ x: p.x, y: p.y, z: p.z });
+
+  const getExplicitKind = (a: TVector3, b: TVector3): ToolpathSegment['kind'] | undefined => {
+    if (a.isRetract || b.isRetract || a.isRapid || b.isRapid) return 'rapid';
+    if (a.isCut || b.isCut || a.isArc || b.isArc) return 'cut';
+    return undefined;
+  };
 
   const segs: ToolpathSegment[] = [];
   for (let i = 0; i < path.length - 1; i++) {
@@ -239,21 +273,32 @@ export function pathToSegments(
     const b = path[i + 1];
     if (a.equals(b)) continue;
 
-    const isCut = !!(a as any).isCut;
-    const kind: ToolpathSegment['kind'] = isCut ? 'cut' : 'rapid'; // retracts/rapids both → G0
-
-    const seg: ToolpathSegment = {
-      kind,
-      pts: [
-        { x: a.x, y: a.y, z: a.z },
-        { x: b.x, y: b.y, z: b.z },
-      ],
-    };
-
-     if (kind === 'cut' && baseFeed !== undefined) {
-      seg.feed = Math.max(1, baseFeed);  // constant feed during cutting
+    const from = clonePoint(a);
+    const to = clonePoint(b);
+    const explicitKind = getExplicitKind(a, b);
+    if (explicitKind) {
+      pushSegment(explicitKind, from, to, baseFeed);
+      continue;
     }
-    segs.push(seg);
+
+    const dz = to.z - from.z;
+    if (Math.abs(dz) <= eps) {
+      pushSegment('cut', from, to, baseFeed);
+      continue;
+    }
+
+    if (dz > 0) {
+      const retractTop = { x: from.x, y: from.y, z: to.z };
+      pushSegment('rapid', from, retractTop);
+      pushSegment('rapid', retractTop, to);
+      continue;
+    }
+
+    const entryPoint = { x: to.x, y: to.y, z: from.z };
+    if (!sameXY(from, entryPoint)) {
+      pushSegment('rapid', from, entryPoint);
+    }
+    pushSegment('plunge', entryPoint, to, plungeFeed);
   }
   return segs;
 }
@@ -280,6 +325,7 @@ export const generateToothPath = (
   // Densify preview path; convert to segments without dy-based throttling
   const raw = pathToSegments(densifyPath(path, maxSegAlong), {
     baseFeed: opts.baseFeed,                   // do NOT pass stepOverMM here (avoids dy-scaling)
+    plungeFeed: Math.max(1, opts.baseFeed * 0.4),
   });
 
   // Constant feed during cutting

@@ -273,6 +273,13 @@ export function generateGCodeFromSegments(props: {
   }
 }): string[] {
   const { bit, material, segments, rotation } = props;
+
+  if (rotation) {
+    if (!Number.isFinite(rotation.steps) || !Number.isInteger(rotation.steps) || rotation.steps <= 0) {
+      throw new Error(`rotation.steps must be a positive integer, got ${rotation.steps}`);
+    }
+  }
+
   const spindleSpeed = bit.material[material]?.spindleSpeed || 15000;
   if (!bit.material[material]?.spindleSpeed) {
     alert('Spindle speed not found in material, defaulting to 15_000 rpm');
@@ -291,6 +298,7 @@ export function generateGCodeFromSegments(props: {
     'G54',                      // work offset
     `G43 Z30.0 H${bit.toolNumber}`, // length offset + safe height
   ];
+  const safeRetractZ = 30.0;
 
   // Pre-position XY at safe Z to the very first commanded point
   const firstPtSeg = segments.find(s => s.pts.length > 0);
@@ -310,16 +318,32 @@ export function generateGCodeFromSegments(props: {
   }
 
   let lastFeed: number | undefined = undefined;
+  let lastMotionPoint: PointXYZ | undefined = undefined;
 
-  const pushG0 = (p: PointXYZ) =>
+  const isSamePoint = (a: PointXYZ, b: PointXYZ) =>
+    a.x === b.x && a.y === b.y && a.z === b.z;
+
+  const pushG0 = (p: PointXYZ) => {
+    if (lastMotionPoint && isSamePoint(lastMotionPoint, p)) return;
     gcode.push(`G0 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}`);
+    lastMotionPoint = p;
+  };
 
   const pushG1 = (p: PointXYZ, feed?: number) => {
+    if (lastMotionPoint && isSamePoint(lastMotionPoint, p)) return;
     const needsF = feed !== undefined && feed !== lastFeed;
     if (feed !== undefined && needsF) lastFeed = feed;
     gcode.push(
       `G1 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}${needsF ? ` F${feed}` : ''}`
     );
+    lastMotionPoint = p;
+  };
+
+  const retractForRotaryIndex = () => {
+    if (!lastMotionPoint) return;
+    if (lastMotionPoint.z >= safeRetractZ) return;
+    gcode.push(`G0 Z${safeRetractZ.toFixed(1)}`);
+    lastMotionPoint = { ...lastMotionPoint, z: safeRetractZ };
   };
 
   const emitSeg = (seg: ToolpathSegment) => {
@@ -346,6 +370,10 @@ export function generateGCodeFromSegments(props: {
       case 'arc': {
         const [a, b] = seg.pts;
         const { cx, cy, cw } = seg.arc!;
+        if (isSamePoint(a, b)) break;
+        if (lastMotionPoint && !isSamePoint(lastMotionPoint, a)) {
+          throw new Error('Arc segment start does not match current tool position');
+        }
         const g = cw ? 'G2' : 'G3';
         const i = (cx - a.x).toFixed(3);
         const j = (cy - a.y).toFixed(3);
@@ -353,42 +381,54 @@ export function generateGCodeFromSegments(props: {
         const needsF = seg.feed !== undefined && seg.feed !== lastFeed;
         if (seg.feed !== undefined && needsF) lastFeed = seg.feed;
         gcode.push(`${g} X${b.x.toFixed(3)} Y${b.y.toFixed(3)}${zTerm} I${i} J${j}${needsF ? ` F${seg.feed}` : ''}`);
+        lastMotionPoint = b;
         break;
       }
     }
+  };
+
+  const splitSegmentsIntoPasses = (allSegments: ToolpathSegment[]): ToolpathSegment[][] => {
+    const passes: ToolpathSegment[][] = [];
+    let buf: ToolpathSegment[] = [];
+    let sawCutMotion = false;
+
+    allSegments.forEach(seg => {
+      buf.push(seg);
+
+      if (seg.kind === 'plunge' || seg.kind === 'cut' || seg.kind === 'arc') {
+        sawCutMotion = true;
+      }
+
+      // A pass ends at the first rapid after any cut/plunge motion.
+      if (seg.kind === 'rapid' && sawCutMotion) {
+        passes.push(buf);
+        buf = [];
+        sawCutMotion = false;
+      }
+    });
+
+    if (buf.length) passes.push(buf);
+    return passes;
   };
 
   if (!rotation || rotation.mode === 'fullPassPerRotation') {
     // ---- Original behaviour: do full path, then rotate ----
     for (let step = 0; step < (hasRotary ? rotation.steps : 1); step++) {
       const currentAngle = aStart + step * angleStep;
-      if (hasRotary) gcode.push(`G1 A${currentAngle.toFixed(3)}`);
+      if (hasRotary) {
+        retractForRotaryIndex();
+        gcode.push(`G0 A${currentAngle.toFixed(3)}`);
+      }
       segments.forEach(emitSeg);
     }
   } else if (rotation.mode === 'onePassPerRotation') {
-    // ---- New behaviour: emit one pass (rapid→plunge→cuts→retract), then rotate ----
-    if (hasRotary) {
-      // Ensure rotary is at the start angle before the first cut
-      gcode.push(`G0 A${aStart.toFixed(3)}    ; set rotary start`);
-    }
-
-    // Group segments into passes ending in a retract
-    const passes: ToolpathSegment[][] = [];
-    let buf: ToolpathSegment[] = [];
-    segments.forEach(seg => {
-      buf.push(seg);
-      if (seg.kind === 'retract') {
-        passes.push(buf);
-        buf = [];
-      }
-    });
-    if (buf.length) passes.push(buf); // in case the last pass has no retract
+    const passes = splitSegmentsIntoPasses(segments);
 
     const totalPasses = passes.length;
     const requiredSteps = rotation.steps;
 
     if (hasRotary && totalPasses !== requiredSteps) {
-      gcode.push(`(warning: passes=${totalPasses} but rotation.steps=${requiredSteps})`);
+      throw new Error(`onePassPerRotation requires passes (${totalPasses}) to equal rotation.steps (${requiredSteps})`);
     }
 
     let currentAngle = aStart;
@@ -397,34 +437,29 @@ export function generateGCodeFromSegments(props: {
       if (idx > 0 && hasRotary) {
         // Advance BEFORE starting the next pass
         currentAngle += angleStep;
-        gcode.push(`G1 A${currentAngle.toFixed(3)}`);
+        retractForRotaryIndex();
+        gcode.push(`G0 A${currentAngle.toFixed(3)}`);
       }
       pass.forEach(emitSeg);
     });
 
   } else if (rotation.mode === 'repeatPassOverRotation') {
     // ---- Every pass is replayed at EACH rotary step ----
-    // Split the full segment list into "passes" ending with a retract
-    const passes: ToolpathSegment[][] = [];
-    let buf: ToolpathSegment[] = [];
-    segments.forEach(seg => {
-      buf.push(seg);
-      if (seg.kind === 'retract') {
-        passes.push(buf);
-        buf = [];
-      }
-    });
-    if (buf.length) passes.push(buf);   // trailing pass w/o retract
+    const passes = splitSegmentsIntoPasses(segments);
 
     // Iterate each pass; within each pass iterate *all* rotary steps
     passes.forEach((pass, passIdx) => {
       if (hasRotary) {
         // Always start each pass at the base angle
+        retractForRotaryIndex();
         gcode.push(`G0 A${aStart.toFixed(3)}    ; pass ${passIdx+1} reset`);
       }
       for (let step = 0; step < (hasRotary ? rotation.steps : 1); step++) {
         const angle = aStart + step * angleStep;
-        if (hasRotary) gcode.push(`G1 A${angle.toFixed(3)}`);
+        if (hasRotary) {
+          retractForRotaryIndex();
+          gcode.push(`G0 A${angle.toFixed(3)}`);
+        }
         pass.forEach(emitSeg);
       }
     });

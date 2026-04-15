@@ -12,74 +12,169 @@ export function fitArcsInSegments(
 ): ToolpathSegment[] {
   const out: ToolpathSegment[] = [];
 
+  const flushCutRun = (run: ToolpathSegment[]) => {
+    if (run.length === 0) return;
+    out.push(...fitArcsInCutRun(run, { tol, minPts, arcFrac }));
+    run.length = 0;
+  };
+
+  const cutRun: ToolpathSegment[] = [];
+
   for (const seg of segments) {
-    if (seg.kind !== 'cut' || seg.pts.length < minPts) {
+    const prev = cutRun[cutRun.length - 1];
+    const isContiguousCut =
+      seg.kind === 'cut' &&
+      seg.pts.length >= 2 &&
+      (
+        !prev ||
+        (
+          prev.kind === 'cut' &&
+          samePoint(prev.pts[prev.pts.length - 1], seg.pts[0]) &&
+          prev.feed === seg.feed
+        )
+      );
+
+    if (isContiguousCut) {
+      cutRun.push(seg);
+      continue;
+    }
+
+    flushCutRun(cutRun);
+
+    if (seg.kind !== 'cut') {
       out.push(seg);
       continue;
     }
 
-    const pts = seg.pts;
-    const nFit = Math.floor((pts.length - 1) * arcFrac);
+    cutRun.push(seg);
+  }
 
-    let i = 0;
-    while (i < nFit - (minPts - 1)) {
-      // --- 1.  try grow an arc starting at i -------------------------
-      let j = i + 2;                         // need at least 3 points
-      let ok = false;
-      let cx = 0, cy = 0, r = 0, cw = false;
+  flushCutRun(cutRun);
+  return out;
+}
 
-      while (j < nFit + 1) {
-        const slice = pts.slice(i, j + 1);
-        const fit = fitCircle(slice);        // LSQ circle fit (see helper below)
-        if (!fit) break;
-        const { x: Xc, y: Yc, r: R } = fit;
+function fitArcsInCutRun(
+  run: ToolpathSegment[],
+  { tol, minPts, arcFrac }: { tol: number; minPts: number; arcFrac: number }
+): ToolpathSegment[] {
+  if (run.length === 0) return [];
 
-        // max orthogonal residual 
-        const errXY = slice.reduce((m, p) =>
-          Math.max(m, Math.abs(Math.hypot(p.x - Xc, p.y - Yc) - R)), 0);
-        
-        // Also check Z linearity for helix
-        const z0 = slice[0].z, zN = slice[slice.length - 1].z;
-        const dz = zN - z0;
-        const errZ = slice.reduce((m, p, k) => {
-          const t = k / (slice.length - 1);
-          return Math.max(m, Math.abs((z0 + dz * t) - p.z));
-        }, 0);
-        
-        if (errXY > tol || errZ > tol) break; 
-        
-        cx = Xc; cy = Yc; r = R; ok = true;
-        j++;
-      }
-      if (ok && j - i >= minPts) {
-        const start  = pts[i];
-        const end    = pts[j - 1];
-        const cross  = (start.x - cx)*(end.y - cy) - (start.y - cy)*(end.x - cx);
-        cw = cross < 0;                      // CW if negative (right‑handed coord)
+  const feed = run[0].feed;
+  const pts: PointXYZ[] = [run[0].pts[0]];
+  run.forEach(seg => {
+    pts.push(seg.pts[seg.pts.length - 1]);
+  });
 
-        out.push({
-          kind: 'arc',
-          pts: [start, end],
-          feed: seg.feed,
-          arc: { cw, cx, cy, r },
-        });
-        i = j - 1;                           // resume after this arc
-      } else {
-        // couldn't fit – emit as line
+  if (pts.length < minPts) {
+    return run;
+  }
+
+  const out: ToolpathSegment[] = [];
+  const nFit = Math.floor((pts.length - 1) * arcFrac);
+
+  let i = 0;
+  while (i < nFit - (minPts - 1)) {
+    // --- 1.  try grow an arc starting at i -------------------------
+    let j = i + 2;                         // need at least 3 points
+    let ok = false;
+    let cx = 0, cy = 0, r = 0, cw = false;
+
+    while (j < nFit + 1) {
+      const slice = pts.slice(i, j + 1);
+      const fit = fitCircle(slice);        // LSQ circle fit (see helper below)
+      if (!fit) break;
+      const { x: Xc, y: Yc, r: R } = fit;
+
+      // max orthogonal residual 
+      const errXY = slice.reduce((m, p) =>
+        Math.max(m, Math.abs(Math.hypot(p.x - Xc, p.y - Yc) - R)), 0);
+      
+      // Also check Z linearity for helix
+      const z0 = slice[0].z, zN = slice[slice.length - 1].z;
+      const dz = zN - z0;
+      const errZ = slice.reduce((m, p, k) => {
+        const t = k / (slice.length - 1);
+        return Math.max(m, Math.abs((z0 + dz * t) - p.z));
+      }, 0);
+      
+      if (errXY > tol || errZ > tol) break; 
+      
+      cx = Xc; cy = Yc; r = R; ok = true;
+      j++;
+    }
+    if (ok && j - i >= minPts) {
+      const start  = pts[i];
+      const end    = pts[j - 1];
+      const slice = pts.slice(i, j);
+
+      if (isNearLinearSlice(slice, tol, r)) {
         out.push({
           kind: 'cut',
-          pts: [pts[i], pts[i+1]],
-          feed: seg.feed,
+          pts: [pts[i], pts[i + 1]],
+          feed,
         });
         i++;
+        continue;
       }
-    }
-    // copy any tail points (last 20%)
-    for (; i < pts.length - 1; i++) {
-      out.push({ kind: 'cut', pts: [pts[i], pts[i + 1]], feed: seg.feed });
+
+      const cross  = (start.x - cx)*(end.y - cy) - (start.y - cy)*(end.x - cx);
+      cw = cross < 0;                      // CW if negative (right‑handed coord)
+
+      out.push({
+        kind: 'arc',
+        pts: [start, end],
+        feed,
+        arc: { cw, cx, cy, r },
+      });
+      i = j - 1;                           // resume after this arc
+    } else {
+      // couldn't fit – emit as line
+      out.push({
+        kind: 'cut',
+        pts: [pts[i], pts[i+1]],
+        feed,
+      });
+      i++;
     }
   }
+
+  // copy any tail points (last 20%)
+  for (; i < pts.length - 1; i++) {
+    out.push({ kind: 'cut', pts: [pts[i], pts[i + 1]], feed });
+  }
+
   return out;
+}
+
+function samePoint(a: PointXYZ, b: PointXYZ): boolean {
+  return a.x === b.x && a.y === b.y && a.z === b.z;
+}
+
+function isNearLinearSlice(pts: PointXYZ[], tol: number, radius: number): boolean {
+  if (pts.length < 3) return true;
+
+  const start = pts[0];
+  const end = pts[pts.length - 1];
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const chord = Math.hypot(dx, dy);
+
+  if (chord <= tol) return true;
+
+  const lineDeviation = pts.slice(1, -1).reduce((max, p) => {
+    const numer = Math.abs(dy * p.x - dx * p.y + end.x * start.y - end.y * start.x);
+    return Math.max(max, numer / chord);
+  }, 0);
+
+  if (lineDeviation <= tol) return true;
+
+  if (radius <= 0 || !Number.isFinite(radius)) return true;
+
+  const halfChord = chord / 2;
+  if (radius <= halfChord) return false;
+
+  const sagitta = radius - Math.sqrt(Math.max(0, radius * radius - halfChord * halfChord));
+  return sagitta <= tol;
 }
 
 /* --- very small helper: Kasa circle fit --------------------------- */

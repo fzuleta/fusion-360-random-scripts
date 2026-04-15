@@ -11,8 +11,8 @@ export const Overlay = (props: IProps) => {
   return !props.constructed ? null : <div className={styles.overlay}>
   <Rotation {...props} />
   <Segments {...props} /> 
-  <WhatIsThisProject {...props} /> 
-  <Disclaimer {...props} />
+  <WhatIsThisProject /> 
+  <Disclaimer />
   </div>
 };
 
@@ -67,7 +67,7 @@ const Segments = (props: IProps) => {
     end.forEach((p, i) => makeMarker(p, 0xffff00, 'end', i));  
  
 
-  }, [start, end, props.toolpathGroupRef ]);
+  }, [start, second, end, props.toolpathGroupRef ]);
 return segments.length === 0 ? <></> : (
   <details className={styles.accordion}>
     <summary className={styles.summary}>📍 Segment Points</summary>
@@ -189,7 +189,7 @@ const Rotation=(props: IProps) => {
     </div>
   </details> 
 }
-const WhatIsThisProject = (_: IProps) => {
+const WhatIsThisProject = () => {
   return (
     <details className={styles.accordion}>
       <summary className={styles.summary}>🙋🏼‍♂️ What is this project?</summary>
@@ -210,7 +210,7 @@ const WhatIsThisProject = (_: IProps) => {
     </details>
   );
 }
-const Disclaimer=(_: IProps) => {
+const Disclaimer=() => {
    return <details className={styles.accordion}>
     <summary className={styles.summary}>⚠️ Disclaimer</summary>
     <div className={styles.accordionContent}>
