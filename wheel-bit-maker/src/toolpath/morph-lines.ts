@@ -60,6 +60,11 @@ export interface GCodeSettings {
   workOffset: string;
   toolNumber?: number;
   spindleSpeed?: number;
+  startupPosition: {
+    x: number;
+    y: number;
+    z: number;
+  };
   safeRetract: {
     x?: number;
     y?: number;
@@ -70,6 +75,7 @@ export interface GCodeSettings {
 
 export const DEFAULT_GCODE_SETTINGS: GCodeSettings = {
   workOffset: 'G54',
+  startupPosition: { x: 50, y: 50, z: 0 },
   safeRetract: { z: 0 },
   machineActions: {
     homeZBeforeStart: true,
@@ -363,10 +369,23 @@ export function generateGCodeFromSegments(props: {
     ...DEFAULT_GCODE_SETTINGS.safeRetract,
     ...settings?.safeRetract,
   };
+  const startupPosition = {
+    ...DEFAULT_GCODE_SETTINGS.startupPosition,
+    ...settings?.startupPosition,
+  };
   const machineActions = {
     ...DEFAULT_GCODE_SETTINGS.machineActions,
     ...settings?.machineActions,
   };
+  if (!Number.isFinite(startupPosition.x)) {
+    throw new Error(`startup position X must be a finite number, got ${startupPosition.x}`);
+  }
+  if (!Number.isFinite(startupPosition.y)) {
+    throw new Error(`startup position Y must be a finite number, got ${startupPosition.y}`);
+  }
+  if (!Number.isFinite(startupPosition.z)) {
+    throw new Error(`startup position Z must be a finite number, got ${startupPosition.z}`);
+  }
   if (safeRetract.x !== undefined && !Number.isFinite(safeRetract.x)) {
     throw new Error(`safe retract X must be a finite number, got ${safeRetract.x}`);
   }
@@ -386,7 +405,8 @@ export function generateGCodeFromSegments(props: {
     'G04 P1.0' ,                // 1-second dwell for full RPM -- according to chatgpt CVD coating can take a little bit to get the air in
     'M8',                       // air / coolant on
     workOffset,                 // work offset
-    `G43 Z${safeRetract.z.toFixed(1)} H${toolNumber}`, // length offset + safe height
+    `G0 X${startupPosition.x.toFixed(3)} Y${startupPosition.y.toFixed(3)} Z${startupPosition.z.toFixed(3)} ; startup park from work offset`,
+    `G43 Z${safeRetract.z.toFixed(1)} H${toolNumber}`, // enable length comp at startup height
   ];
   if (machineActions.homeZBeforeStart) {
     gcode.splice(2, 0, 'G28 G91 Z0.', 'G90');
@@ -396,7 +416,7 @@ export function generateGCodeFromSegments(props: {
   let lastFeed: number | undefined = undefined;
   let lastMotionPoint: PointXYZ | undefined;
 
-  // Pre-position XY at safe Z to the very first commanded point
+  // Pre-position XY at safe Z to the very first commanded point.
   const firstPtSeg = segments.find(s => s.pts.length > 0);
   if (firstPtSeg) {
     const pt = firstPtSeg.pts[0];

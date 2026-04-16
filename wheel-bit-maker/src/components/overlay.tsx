@@ -55,6 +55,23 @@ const PostSettings = (props: IProps) => {
     });
   };
 
+  const updateStartupAxis = (axis: 'x' | 'y' | 'z', rawValue: string) => {
+    onGcodeSettingsChange(current => {
+      const parsed = Number(rawValue);
+      if (!Number.isFinite(parsed)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        startupPosition: {
+          ...current.startupPosition,
+          [axis]: parsed,
+        },
+      };
+    });
+  };
+
   const updateSpindleSpeed = (rawValue: string) => {
     onGcodeSettingsChange(current => {
       if (rawValue.trim() === '') {
@@ -164,6 +181,36 @@ const PostSettings = (props: IProps) => {
       </div>
 
       <div className={styles.inputGroup}>
+        <div style={{ marginBottom: 6, fontWeight: 700, color: '#ddd' }}>Startup Park</div>
+        <div className={styles.inputRow}>
+          <label>X</label>
+          <input
+            type="number"
+            step="0.001"
+            value={gcodeSettings.startupPosition.x}
+            onChange={(e) => updateStartupAxis('x', e.target.value)}
+          />
+          <label>Y</label>
+          <input
+            type="number"
+            step="0.001"
+            value={gcodeSettings.startupPosition.y}
+            onChange={(e) => updateStartupAxis('y', e.target.value)}
+          />
+          <label>Z</label>
+          <input
+            type="number"
+            step="0.001"
+            value={gcodeSettings.startupPosition.z}
+            onChange={(e) => updateStartupAxis('z', e.target.value)}
+          />
+        </div>
+        <div style={{ fontSize: '0.85em', color: '#999' }}>
+          Work-coordinate XYZ move issued immediately after the work offset and before `G43`.
+        </div>
+      </div>
+
+      <div className={styles.inputGroup}>
         <div style={{ marginBottom: 6, fontWeight: 700, color: '#ddd' }}>Safe Retract</div>
         <div className={styles.inputRow}>
           <label>X</label>
@@ -191,7 +238,7 @@ const PostSettings = (props: IProps) => {
           />
         </div>
         <div style={{ fontSize: '0.85em', color: '#999' }}>
-          X/Y are optional park coordinates for rotary-safe retracts. Z is the required clearance height.
+          X/Y are optional park coordinates for rotary-safe retracts after cutting starts. Z is the required clearance height.
         </div>
       </div>
 

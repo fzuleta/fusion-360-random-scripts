@@ -78,6 +78,7 @@ describe('generateGCodeFromSegments', () => {
       'G04 P1.0',
       'M8',
       'G54',
+      'G0 X50.000 Y50.000 Z0.000 ; startup park from work offset',
       'G43 Z0.0 H7',
       'G0 X0.000 Y0.000 ; pre-position XY at safe Z',
       'G1 X0.000 Y0.000 Z-1.000 F100',
@@ -119,6 +120,7 @@ describe('generateGCodeFromSegments', () => {
       'G04 P1.0',
       'M8',
       'G54',
+      'G0 X50.000 Y50.000 Z0.000 ; startup park from work offset',
       'G43 Z0.0 H7',
       'G0 X0.000 Y0.000 ; pre-position XY at safe Z',
       'G1 X0.000 Y0.000 Z-1.000 F100',
@@ -173,6 +175,54 @@ describe('generateGCodeFromSegments', () => {
     expect(gcode).toContain('( TOOL 12  Ø3.175 CVD-DIA )');
     expect(gcode).toContain('T12 M6');
     expect(gcode).toContain('G43 Z0.0 H12');
+  });
+
+  it('uses the configured startup park before applying tool length compensation', () => {
+    const gcode = generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: makeBit(12000),
+      segments: baseSegments,
+      settings: {
+        ...DEFAULT_GCODE_SETTINGS,
+        startupPosition: { x: 12.5, y: 34.25, z: 17.5 },
+      },
+    });
+
+    expect(gcode).toContain('G0 X12.500 Y34.250 Z17.500 ; startup park from work offset');
+    expect(gcode).toContain('G43 Z17.5 H7');
+    expect(gcode).toContain('G0 X0.000 Y0.000 ; pre-position XY at safe Z');
+  });
+
+  it('throws when startup park axes are non-finite', () => {
+    expect(() => generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: makeBit(12000),
+      segments: baseSegments,
+      settings: {
+        ...DEFAULT_GCODE_SETTINGS,
+        startupPosition: { x: Number.NaN, y: 50, z: 25 },
+      },
+    })).toThrow(/startup position X must be a finite number/);
+
+    expect(() => generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: makeBit(12000),
+      segments: baseSegments,
+      settings: {
+        ...DEFAULT_GCODE_SETTINGS,
+        startupPosition: { x: 50, y: Number.POSITIVE_INFINITY, z: 25 },
+      },
+    })).toThrow(/startup position Y must be a finite number/);
+
+    expect(() => generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: makeBit(12000),
+      segments: baseSegments,
+      settings: {
+        ...DEFAULT_GCODE_SETTINGS,
+        startupPosition: { x: 50, y: 50, z: Number.NaN },
+      },
+    })).toThrow(/startup position Z must be a finite number/);
   });
 
   it('throws when the post tool-number override is invalid', () => {

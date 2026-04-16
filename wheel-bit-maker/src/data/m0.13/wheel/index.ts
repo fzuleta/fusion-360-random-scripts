@@ -7,8 +7,19 @@ import type { GCodeSettingsOverrides, IConstruction, IConstructProps } from '../
 
 export const filename = 'm=0.13 Z=112.stl';
 const bits = carbideBits;
-const defaultPassSafeRetract = (safeRetract: GCodeSettingsOverrides['safeRetract']) => ({
-  safeRetract,
+const defaultPassPostSettings = ({
+  x = 25,
+  y = 25,
+  z = 25,
+  safeRetractZ,
+}: {
+  x?: number;
+  y?: number;
+  z?: number;
+  safeRetractZ: number;
+}): GCodeSettingsOverrides => ({
+  startupPosition: { x, y, z },
+  safeRetract: { z: safeRetractZ },
 });
 
 export const getHowManyPasses = () => 5;
@@ -90,10 +101,10 @@ const pass0 = (): IConstruction => {
   }
 
   return {
-    name: "1. Rough", 
+    name: "0. Rough", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassSafeRetract({ z: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -166,10 +177,10 @@ const pass1 = (): IConstruction => {
   }
 
   return {
-    name: "2. Finer Rough", 
+    name: "1. Finer Rough", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassSafeRetract({ z: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -241,10 +252,10 @@ const pass2 = (): IConstruction => {
   }
 
   return {
-    name: "3. Side flatten", 
+    name: "2. Side flatten", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassSafeRetract({ z: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -316,10 +327,10 @@ const pass3 = (): IConstruction => {
     }
   }
   return {
-    name: "4. Relief angle", 
+    name: "3. Relief angle", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassSafeRetract({ z: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -421,10 +432,10 @@ const pass4 = (): IConstruction => {
   }
 
   return {
-    name: "5. Tooth", 
+    name: "4. Tooth", 
     type: 'tooth',
     defaultBit: bit, 
-    defaultGcodeSettings: defaultPassSafeRetract({ z: 2 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 2 }),
     construct: (props: {bit?: IBit; material: TMaterial; stockRadius: number}) => {
       const material = props.material;
       const b: IBit = props.bit || bit;
