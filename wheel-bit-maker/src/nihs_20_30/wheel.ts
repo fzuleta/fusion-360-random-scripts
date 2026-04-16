@@ -245,7 +245,12 @@ export function buildRasterPath(
 ): THREE.Vector3[] {
 
   const sign = dir === 'L2R' ? -1 : 1;          // −stepOver for L→R, + for R→L
-  const path: THREE.Vector3[] = [];
+  const asCutPoint = (point: THREE.Vector3): TVector3 => {
+    const v = point.clone() as TVector3;
+    v.isCut = true;
+    return v;
+  };
+  const path: TVector3[] = [];
 
   for (const p of posList) {
     const from      = new THREE.Vector3(p.x, p.y - yOffset, p.z);
@@ -253,7 +258,7 @@ export function buildRasterPath(
     const exitTo    = new THREE.Vector3(to.x   + sign * stepOver, to.y,   to.z);
     const exitFrom  = new THREE.Vector3(from.x + sign * stepOver, from.y, from.z);
 
-    path.push(from, to, exitTo, exitFrom);
+    path.push(asCutPoint(from), asCutPoint(to), asCutPoint(exitTo), asCutPoint(exitFrom));
   }
 
   return path;
@@ -265,16 +270,34 @@ const buildCompleteRasterPath = (
   stepOver: number,
   yOffset: number, 
 ) => {
+  const asPlainPoint = (point: THREE.Vector3): TVector3 => {
+    const v = point.clone() as TVector3;
+    delete v.isCut;
+    delete v.isRapid;
+    delete v.isRetract;
+    delete v.isArc;
+    return v;
+  };
 
   const path = buildRasterPath(leftPositions, stepOver, yOffset, 'L2R'); 
   const safeZ = (z = 1) => new THREE.Vector3(0,0,z);
+  const leftEntry = path[0];
 
-  path.push(leftPositions[leftPositions.length-1].clone().add(safeZ(1))); 
-  path.push(rightPositions[0].clone().add(safeZ(2)));
-  path.push(...buildRasterPath(rightPositions, stepOver, yOffset, 'R2L'));
+  path.unshift(asPlainPoint(leftEntry));
+  path.unshift(asPlainPoint(leftPositions[0].clone().add(safeZ(2))));
 
-  path.push(rightPositions[leftPositions.length-1].clone().add(new THREE.Vector3(0,0,5)));
-  
-  console.log(path)
+  const rightPath = buildRasterPath(rightPositions, stepOver, yOffset, 'R2L');
+  const leftExit = path[path.length - 1];
+  const rightEntry = rightPath[0];
+
+  path.push(asPlainPoint(leftExit));
+  path.push(asPlainPoint(leftPositions[leftPositions.length-1].clone().add(safeZ(1)))); 
+  path.push(asPlainPoint(rightPositions[0].clone().add(safeZ(2))));
+  path.push(asPlainPoint(rightEntry));
+  path.push(...rightPath);
+
+  path.push(asPlainPoint(rightPath[rightPath.length - 1]));
+  path.push(asPlainPoint(rightPositions[rightPositions.length-1].clone().add(new THREE.Vector3(0,0,5))));
+
   return path;
 }
