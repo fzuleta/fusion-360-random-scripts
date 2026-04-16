@@ -33,17 +33,17 @@ const defaultPassPostSettings = ({
 export const getHowManyPasses = () => 6;
 export const getPass = (n: number) => {
   switch (n){
-    case 0: return pass0;
-    case 1: return pass0_5;
-    case 2: return pass1;
-    case 3: return pass2;
-    case 4: return pass3;
-    case 5: return pass4;
+    case 0: return pass0; 
+    case 1: return pass1;
+    case 2: return pass2;
+    case 3: return pass3;
+    case 4: return pass4;
     default:
       throw new Error('Pass doesnt exist');
   }
 }
  
+const offset = {y: 1.5}
 const pass0 = (): IConstruction => { 
   const bit = bits.bit3_175mm_4_flute_chino;
   const cutZ = -0.5;
@@ -51,16 +51,16 @@ const pass0 = (): IConstruction => {
 
   // console.log('Getting m0.13 Z112') 
   const lineA = [ // the border of the stock
-    { x: 3, y: 0, z }, 
-    { x: -17, y: 0, z }
+    { x: 3, y: 0, z }, // y: stockRadius + bitRadius
+    { x: -17, y: 0, z }// y: stockRadius + bitRadius
   ];
   const lineB =  // rough: leave extra support, only mill down to 1.1 mm here
     [
       { x: 3, y: 1.303, z },
       { x: -0.45, y: 1.303, z },
-      { x: -0.45, y: 1.1, z },
-      { x: -15, y: 1.1, z },
-      { x: -17, y: 0, z }
+      { x: -0.45, y: 0.7, z },
+      { x: -15, y: 0.7, z },
+      { x: -17, y: 0, z }// y: stockRadius + bitRadius
   ];
    
   const applyBitRadiusAndStockRadius = (bitRadius: number, stockRadius: number) => {
@@ -122,92 +122,7 @@ const pass0 = (): IConstruction => {
     },
   }
 } 
-
-const pass0_5 = (): IConstruction => { 
-  const bit = bits.bit3_175mm_4_flute_chino;
-  const cutZ = -0.5;
-  const z = cutZ;
-
-  const lineA = [ // roughing boundary left by pass0
-    { x: 3, y: 1.303, z },
-    { x: -0.45, y: 1.303, z },
-    { x: -0.45, y: 1.1, z },
-    { x: -15, y: 1.1, z },
-    { x: -17, y: 0, z }
-  ];
-  const lineB = [ // final target for this region
-    { x: 3, y: 1.303, z },
-    { x: -0.45, y: 1.303, z },
-    { x: -0.45, y: 0.7, z },
-    { x: -15, y: 0.7, z },
-    { x: -17, y: 0, z }
-  ];
-
-  const applyBitRadius = (bitRadius: number, stockRadius: number) => {
-    const lA = JSON.parse(JSON.stringify(lineA));
-    let i = 0;
-    i=0;  lA[i].y += bitRadius;
-    i++;  lA[i].x -= bitRadius; lA[i].y += bitRadius;
-    i++;  lA[i].x -= bitRadius; lA[i].y += bitRadius;
-    i++;  lA[i].x += bitRadius; lA[i].y += bitRadius;
-    i++;  lA[i].y += bitRadius + stockRadius;
-
-    const lB = JSON.parse(JSON.stringify(lineB));
-    i = 0;
-    i=0;  lB[i].y += bitRadius;
-    i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
-    i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
-    i++;  lB[i].x += bitRadius; lB[i].y += bitRadius;
-    i++;  lB[i].y += bitRadius + stockRadius;
-
-    return {
-      lineA: lA,
-      lineB: lB,
-    }
-  }
-
-  return {
-    name: "0.5 Finish 1.1 to 0.7", 
-    type: 'lines',
-    defaultBit: bit,
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractY: 5, safeRetractZ: -0.500 }),
-    construct: (props: IConstructProps) => {
-      const { stockRadius, material } = props;
-      void stockRadius;
-      const b: IBit = props.bit || bit;
-      const bitRadius = b.diameter * 0.5; 
-      const bitMesh = createBitMesh(b); 
-      const matProps = b.material[material];
-      if (!matProps) { 
-        alert('Material not found'); 
-        throw new Error('Material not found')
-      }
-      const {lineA, lineB} = applyBitRadius(bitRadius, stockRadius);
-      return {
-        bit: b,
-        bitMesh,
-        rotation: {
-          mode: 'repeatPassOverRotation',
-          steps: 360 / 8,
-          startAngle: 0, 
-          endAngle: 360
-        }, 
-        ...generatePath({
-          stepOver: matProps.stepOver, 
-          stepOverIsMM: true,
-          alongMaxSegMM: 0.015,
-          arcResMM: 0.01,
-          lineA, 
-          lineB, 
-          stockRadius: 0, 
-          bit: b,
-          feedRate: matProps.feedRate, 
-          cutZ,
-        }),
-      }
-    },
-  }
-}
+ 
 const pass1 = (): IConstruction => { 
   const bit = bits.bit1_6mm_2_flute;  
   const cutZ = -0.5; 
