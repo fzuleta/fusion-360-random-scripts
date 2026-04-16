@@ -11,25 +11,34 @@ const defaultPassPostSettings = ({
   x = 25,
   y = 25,
   z = 25,
+  safeRetractX,
+  safeRetractY,
   safeRetractZ,
 }: {
   x?: number;
   y?: number;
   z?: number;
+  safeRetractX?: number;
+  safeRetractY?: number;
   safeRetractZ: number;
 }): GCodeSettingsOverrides => ({
   startupPosition: { x, y, z },
-  safeRetract: { z: safeRetractZ },
+  safeRetract: {
+    ...(safeRetractX !== undefined ? { x: safeRetractX } : {}),
+    ...(safeRetractY !== undefined ? { y: safeRetractY } : {}),
+    z: safeRetractZ,
+  },
 });
 
-export const getHowManyPasses = () => 5;
+export const getHowManyPasses = () => 6;
 export const getPass = (n: number) => {
   switch (n){
     case 0: return pass0;
-    case 1: return pass1;
-    case 2: return pass2;
-    case 3: return pass3;
-    case 4: return pass4;
+    case 1: return pass0_5;
+    case 2: return pass1;
+    case 3: return pass2;
+    case 4: return pass3;
+    case 5: return pass4;
     default:
       throw new Error('Pass doesnt exist');
   }
@@ -67,18 +76,18 @@ export const getLeftRight = (offsetX: number = 0.5, _points: Segment[]) => {
   return {left, right};
 }
 const pass0 = (): IConstruction => { 
-  const bit = bits.bit3_175mm_4_flute_chino;
+  const bit = bits.bit3_175mm_3_flute_aluminum;
   const cutZ = -0.5;
   const lineA = [ // the border of the stock
     { x: 3, y: 0, z: cutZ }, 
     { x: -17, y: 0, z: cutZ }
   ];
-  const lineB =  // the inner profile
+  const lineB =  // rough: leave extra support, only mill down to 1.1 mm here
     [
       { x: 3, y: 1.3, z: cutZ },
       { x: -0.42, y: 1.3, z: cutZ },
-      { x: -0.42, y: 0.7, z: cutZ },
-      { x: -15, y: 0.7, z: cutZ },
+      { x: -0.42, y: 1.1, z: cutZ },
+      { x: -15, y: 1.1, z: cutZ },
       { x: -17, y: 0, z: cutZ }
     ];
  
@@ -101,10 +110,10 @@ const pass0 = (): IConstruction => {
   }
 
   return {
-    name: "0. Rough", 
+    name: "0. Rough to 1.1", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -133,6 +142,90 @@ const pass0 = (): IConstruction => {
           lineA, 
           lineB, 
           stockRadius, 
+          bit: b,
+          feedRate: matProps.feedRate, 
+          cutZ,
+        }),
+      }
+    },
+  }
+} 
+
+const pass0_5 = (): IConstruction => { 
+  const bit = bits.bit3_175mm_3_flute_aluminum;
+  const cutZ = -0.5;
+  const lineA = [ // roughing boundary left by pass0
+    { x: 3, y: 1.3, z: cutZ },
+    { x: -0.42, y: 1.3, z: cutZ },
+    { x: -0.42, y: 1.1, z: cutZ },
+    { x: -15, y: 1.1, z: cutZ },
+    { x: -17, y: 0, z: cutZ }
+  ];
+  const lineB = [ // final target for this region
+    { x: 3, y: 1.3, z: cutZ },
+    { x: -0.42, y: 1.3, z: cutZ },
+    { x: -0.42, y: 0.7, z: cutZ },
+    { x: -15, y: 0.7, z: cutZ },
+    { x: -17, y: 0, z: cutZ }
+  ];
+
+  const applyBitRadius = (bitRadius: number, stockRadius: number) => {
+    const lA = JSON.parse(JSON.stringify(lineA));
+    let i = 0;
+    i=0;  lA[i].y += bitRadius;
+    i++;  lA[i].x -= bitRadius; lA[i].y += bitRadius;
+    i++;  lA[i].x -= bitRadius; lA[i].y += bitRadius;
+    i++;  lA[i].x += bitRadius; lA[i].y += bitRadius;
+    i++;  lA[i].y += bitRadius + stockRadius;
+
+    const lB = JSON.parse(JSON.stringify(lineB));
+    i = 0;
+    i=0;  lB[i].y += bitRadius;
+    i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
+    i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
+    i++;  lB[i].x += bitRadius; lB[i].y += bitRadius;
+    i++;  lB[i].y += bitRadius + stockRadius;
+
+    return {
+      lineA: lA,
+      lineB: lB,
+    }
+  }
+
+  return {
+    name: "0.5 Finish 1.1 to 0.7", 
+    type: 'lines',
+    defaultBit: bit,
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractY: 5, safeRetractZ: -0.500 }),
+    construct: (props: IConstructProps) => {
+      const { stockRadius, material } = props;
+      void stockRadius;
+      const b: IBit = props.bit || bit;
+      const bitRadius = b.diameter * 0.5; 
+      const bitMesh = createBitMesh(b); 
+      const matProps = b.material[material];
+      if (!matProps) { 
+        alert('Material not found'); 
+        throw new Error('Material not found')
+      }
+      const {lineA, lineB} = applyBitRadius(bitRadius, stockRadius);
+      return {
+        bit: b,
+        bitMesh,
+        rotation: {
+          mode: 'repeatPassOverRotation',
+          steps: 360 / 8,
+          startAngle: 0, 
+          endAngle: 360
+        }, 
+        ...generatePath({
+          stepOver: matProps.stepOver, 
+          stepOverIsMM: true,
+          alongMaxSegMM: 0.015,
+          arcResMM: 0.01,
+          lineA, 
+          lineB, 
+          stockRadius: 0, 
           bit: b,
           feedRate: matProps.feedRate, 
           cutZ,
@@ -180,7 +273,7 @@ const pass1 = (): IConstruction => {
     name: "1. Finer Rough", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -255,7 +348,7 @@ const pass2 = (): IConstruction => {
     name: "2. Side flatten", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -330,7 +423,7 @@ const pass3 = (): IConstruction => {
     name: "3. Relief angle", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;

@@ -131,6 +131,91 @@ describe('generateGCodeFromSegments', () => {
     ]);
   });
 
+  it('retracts to safe Z before lateral rapid moves', () => {
+    const gcode = generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: makeBit(12000),
+      segments: [
+        {
+          kind: 'plunge',
+          pts: [{ x: -16.989, y: 5.579, z: -0.5 }],
+          feed: 100,
+        },
+        {
+          kind: 'cut',
+          pts: [
+            { x: -16.989, y: 5.579, z: -0.5 },
+            { x: -17.0, y: 5.588, z: -0.5 },
+          ],
+          feed: 250,
+        },
+        {
+          kind: 'rapid',
+          pts: [{ x: -17.0, y: 3.587, z: -0.5 }],
+        },
+      ],
+      settings: {
+        ...DEFAULT_GCODE_SETTINGS,
+        machineActions: {
+          homeZBeforeStart: false,
+          homeZAfterEnd: false,
+          homeXYAfterEnd: false,
+          resetRotaryAfterEnd: false,
+        },
+      },
+    });
+
+    expect(gcode).toContain('G0 Z0.0');
+    expect(gcode).toContain('G0 X-17.000 Y3.587 Z0.000');
+    expect(gcode).not.toContain('G0 X-17.000 Y3.587 Z-0.500');
+  });
+
+  it('skips planner clearance-lane rapids when a global safe retract Y is configured', () => {
+    const gcode = generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: makeBit(12000),
+      segments: [
+        {
+          kind: 'plunge',
+          pts: [{ x: -16.987, y: 4.581, z: -0.5 }],
+          feed: 100,
+        },
+        {
+          kind: 'cut',
+          pts: [
+            { x: -16.987, y: 4.581, z: -0.5 },
+            { x: -17.0, y: 4.588, z: -0.5 },
+          ],
+          feed: 250,
+        },
+        {
+          kind: 'rapid',
+          pts: [{ x: -17.0, y: 3.587, z: -0.5 }],
+        },
+      ],
+      rotation: {
+        mode: 'fullPassPerRotation',
+        steps: 2,
+        startAngle: 0,
+        endAngle: 8,
+      },
+      settings: {
+        ...DEFAULT_GCODE_SETTINGS,
+        safeRetract: { z: 0, y: 5 },
+        machineActions: {
+          homeZBeforeStart: false,
+          homeZAfterEnd: false,
+          homeXYAfterEnd: false,
+          resetRotaryAfterEnd: false,
+        },
+      },
+    });
+
+    expect(gcode).toContain('G0 Z0.0');
+    expect(gcode).toContain('G0 X-17.000 Y5.000 Z0.000');
+    expect(gcode).not.toContain('G0 X-17.000 Y3.587 Z0.000');
+  });
+
   it('throws when spindle speed is missing everywhere', () => {
     expect(() => generateGCodeFromSegments({
       material: 'A2-Rough',

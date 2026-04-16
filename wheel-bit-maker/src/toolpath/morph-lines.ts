@@ -427,6 +427,7 @@ export function generateGCodeFromSegments(props: {
   const hasRotary   = !!rotation;
   const aStart = rotation?.startAngle ?? 0;
   const firstRotaryAngle = rotaryAngles[0] ?? aStart;
+  const hasGlobalSafeRetractXY = safeRetract.x !== undefined || safeRetract.y !== undefined;
 
   if (hasRotary) {
     gcode.push(`G0 A${firstRotaryAngle.toFixed(3)}    ; set rotary start`);
@@ -442,6 +443,24 @@ export function generateGCodeFromSegments(props: {
     if (lastMotionPoint && isSamePoint(lastMotionPoint, p)) return;
     gcode.push(`G0 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}${p.z !== undefined ? ` Z${p.z.toFixed(3)}` : ''}`);
     lastMotionPoint = p;
+  };
+
+  const pushSafeRapid = (p: PointXYZ) => {
+    if (lastMotionPoint) {
+      const xyChanges = !isSameXY(lastMotionPoint, p);
+      const currentZ = lastMotionPoint.z;
+      if (xyChanges && currentZ < safeRetractZ) {
+        gcode.push(`G0 Z${safeRetractZ.toFixed(1)}`);
+        lastMotionPoint = { ...lastMotionPoint, z: safeRetractZ };
+      }
+    }
+
+    const rapidTarget =
+      lastMotionPoint && !isSameXY(lastMotionPoint, p) && (p.z ?? safeRetractZ) < safeRetractZ
+        ? { ...p, z: safeRetractZ }
+        : p;
+
+    pushG0(rapidTarget);
   };
 
   const pushG1 = (p: PointXYZ, feed?: number) => {
@@ -486,7 +505,10 @@ export function generateGCodeFromSegments(props: {
     switch (seg.kind) {
       case 'rapid':
       case 'retract': // treat retracts as true rapids in G‑code
-        seg.pts.forEach(pushG0);
+        if (hasGlobalSafeRetractXY && seg.pts.length === 1) {
+          break;
+        }
+        seg.pts.forEach(pushSafeRapid);
         break;
       case 'plunge':
         prepareForFeedMove(seg.pts[0]);
@@ -649,6 +671,7 @@ export function buildMachinePreviewPath(props: {
     arcRes = 0.2,
   } = props;
   const rotaryAngles = getRotaryAngles(rotation);
+  const hasGlobalSafeRetractXY = safeRetract.x !== undefined || safeRetract.y !== undefined;
 
   const out: TVector3[] = [];
   let lastMotionPoint: PointXYZ | undefined;
@@ -683,6 +706,22 @@ export function buildMachinePreviewPath(props: {
     lastMotionPoint = p;
   };
 
+  const pushSafeRapidTo = (p: PointXYZ) => {
+    if (lastMotionPoint) {
+      const xyChanges = !isSameXY(lastMotionPoint, p);
+      if (xyChanges && lastMotionPoint.z < safeRetractZ) {
+        pushRapidTo({ ...lastMotionPoint, z: safeRetractZ });
+      }
+    }
+
+    const rapidTarget =
+      lastMotionPoint && !isSameXY(lastMotionPoint, p) && (p.z ?? safeRetractZ) < safeRetractZ
+        ? { ...p, z: safeRetractZ }
+        : p;
+
+    pushRapidTo(rapidTarget);
+  };
+
   const pushCutTo = (p: PointXYZ, kind: 'cut' | 'arc' = 'cut') => {
     if (lastMotionPoint && isSamePoint(lastMotionPoint, p)) return;
     pushPoint(p, kind);
@@ -695,7 +734,7 @@ export function buildMachinePreviewPath(props: {
       pushRapidTo({ ...lastMotionPoint, z: safeRetractZ });
     }
     if (safeRetract.x !== undefined || safeRetract.y !== undefined) {
-      pushRapidTo({
+      pushSafeRapidTo({
         x: safeRetract.x ?? lastMotionPoint.x,
         y: safeRetract.y ?? lastMotionPoint.y,
         z: safeRetractZ,
@@ -705,18 +744,18 @@ export function buildMachinePreviewPath(props: {
 
   const prepareForFeedMove = (target: PointXYZ) => {
     if (!lastMotionPoint) {
-      pushRapidTo({ x: target.x, y: target.y, z: safeRetractZ });
+      pushSafeRapidTo({ x: target.x, y: target.y, z: safeRetractZ });
     }
     if (!lastMotionPoint) return;
 
     const approachZ = Math.min(safeRetractZ, target.z + approachOffsetZ);
 
     if (!isSameXY(lastMotionPoint, target)) {
-      pushRapidTo({ x: target.x, y: target.y, z: lastMotionPoint.z });
+      pushSafeRapidTo({ x: target.x, y: target.y, z: lastMotionPoint.z });
     }
 
     if (lastMotionPoint.z > approachZ) {
-      pushRapidTo({ x: target.x, y: target.y, z: approachZ });
+      pushSafeRapidTo({ x: target.x, y: target.y, z: approachZ });
     }
   };
 
@@ -746,7 +785,10 @@ export function buildMachinePreviewPath(props: {
     switch (seg.kind) {
       case 'rapid':
       case 'retract':
-        seg.pts.forEach(pushRapidTo);
+        if (hasGlobalSafeRetractXY && seg.pts.length === 1) {
+          break;
+        }
+        seg.pts.forEach(pushSafeRapidTo);
         break;
       case 'plunge': {
         prepareForFeedMove(seg.pts[0]);
