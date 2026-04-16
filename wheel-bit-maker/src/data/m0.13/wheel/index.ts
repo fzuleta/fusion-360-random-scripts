@@ -270,7 +270,7 @@ const pass1 = (): IConstruction => {
   }
 
   return {
-    name: "1. Finer Rough", 
+    name: "1. Finer Rough 🚫", 
     type: 'lines',
     defaultBit: bit,
     defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),

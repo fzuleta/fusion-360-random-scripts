@@ -11,15 +11,23 @@ const defaultPassPostSettings = ({
   x = 25,
   y = 25,
   z = 25,
+  safeRetractX,
+  safeRetractY,
   safeRetractZ,
 }: {
   x?: number;
   y?: number;
   z?: number;
+  safeRetractX?: number;
+  safeRetractY?: number;
   safeRetractZ: number;
 }): GCodeSettingsOverrides => ({
   startupPosition: { x, y, z },
-  safeRetract: { z: safeRetractZ },
+  safeRetract: {
+    ...(safeRetractX !== undefined ? { x: safeRetractX } : {}),
+    ...(safeRetractY !== undefined ? { y: safeRetractY } : {}),
+    z: safeRetractZ,
+  },
 });
 
 export const getHowManyPasses = () => 6;
@@ -53,8 +61,8 @@ const pass0 = (): IConstruction => {
       { x: -0.45, y: 1.1, z },
       { x: -15, y: 1.1, z },
       { x: -17, y: 0, z }
-    ];
- 
+  ];
+   
   const applyBitRadiusAndStockRadius = (bitRadius: number, stockRadius: number) => {
     const lA = JSON.parse(JSON.stringify(lineA));
     lA.forEach((it: any) => it.y += stockRadius + bitRadius); 
@@ -65,7 +73,7 @@ const pass0 = (): IConstruction => {
     i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
     i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
     i++;  lB[i].x += bitRadius; lB[i].y += bitRadius;
-    i++;  lB[i].y += bitRadius;
+    i++;  lB[i].y += stockRadius + bitRadius;
 
     return {
       lineA: lA,
@@ -77,7 +85,7 @@ const pass0 = (): IConstruction => {
     name: "0. Rough to 1.1", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -94,7 +102,7 @@ const pass0 = (): IConstruction => {
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
-          steps: 360 / 8, // every 8 degrees
+          steps: 360 / 8, // every 4 degrees
           startAngle: 0, 
           endAngle: 360
         }, 
@@ -113,7 +121,7 @@ const pass0 = (): IConstruction => {
       }
     },
   }
-}
+} 
 
 const pass0_5 = (): IConstruction => { 
   const bit = bits.bit3_175mm_4_flute_chino;
@@ -135,14 +143,14 @@ const pass0_5 = (): IConstruction => {
     { x: -17, y: 0, z }
   ];
 
-  const applyBitRadius = (bitRadius: number) => {
+  const applyBitRadius = (bitRadius: number, stockRadius: number) => {
     const lA = JSON.parse(JSON.stringify(lineA));
     let i = 0;
     i=0;  lA[i].y += bitRadius;
     i++;  lA[i].x -= bitRadius; lA[i].y += bitRadius;
     i++;  lA[i].x -= bitRadius; lA[i].y += bitRadius;
     i++;  lA[i].x += bitRadius; lA[i].y += bitRadius;
-    i++;  lA[i].y += bitRadius;
+    i++;  lA[i].y += bitRadius + stockRadius;
 
     const lB = JSON.parse(JSON.stringify(lineB));
     i = 0;
@@ -150,7 +158,7 @@ const pass0_5 = (): IConstruction => {
     i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
     i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
     i++;  lB[i].x += bitRadius; lB[i].y += bitRadius;
-    i++;  lB[i].y += bitRadius;
+    i++;  lB[i].y += bitRadius + stockRadius;
 
     return {
       lineA: lA,
@@ -162,7 +170,7 @@ const pass0_5 = (): IConstruction => {
     name: "0.5 Finish 1.1 to 0.7", 
     type: 'lines',
     defaultBit: bit,
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractY: 5, safeRetractZ: -0.500 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       void stockRadius;
@@ -174,7 +182,7 @@ const pass0_5 = (): IConstruction => {
         alert('Material not found'); 
         throw new Error('Material not found')
       }
-      const {lineA, lineB} = applyBitRadius(bitRadius);
+      const {lineA, lineB} = applyBitRadius(bitRadius, stockRadius);
       return {
         bit: b,
         bitMesh,
@@ -237,7 +245,7 @@ const pass1 = (): IConstruction => {
   }
 
   return {
-    name: "1. Finer Rough", 
+    name: "1. Finer Rough 🚫", 
     type: 'lines',
     defaultBit: bit,
     defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 0 }),
