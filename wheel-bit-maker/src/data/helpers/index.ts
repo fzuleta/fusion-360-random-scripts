@@ -322,8 +322,10 @@ export const generateToothPath = (
   const stepOverMM = opts.stepOverIsMM ? opts.stepOver : opts.stepOver * opts.bitDiameter;
   const maxSegAlong = opts.alongMaxSegMM ?? Math.min(0.20, stepOverMM);
 
-  // Densify preview path; convert to segments without dy-based throttling
-  const raw = pathToSegments(densifyPath(path, maxSegAlong), {
+  // Preserve the original tooth-path semantics for G-code generation.
+  // Densifying before classification turns diagonal transfer moves into
+  // many tiny rapid/plunge steps.
+  const raw = pathToSegments(path, {
     baseFeed: opts.baseFeed,                   // do NOT pass stepOverMM here (avoids dy-scaling)
     plungeFeed: Math.max(1, opts.baseFeed * 0.4),
   });
@@ -333,18 +335,12 @@ export const generateToothPath = (
     if (s.kind === 'cut') s.feed = Math.max(1, opts.baseFeed);
   }
 
-  const fitted = fitArcsInSegments(raw, {
-    tol: opts.arcTolMM ?? (stepOverMM <= 0.05 ? 0.01 : 0.02),
-    minPts: 3,
-    arcFrac: 1,
-  });
-
   const segmentsForThreeJs = segmentsToVectorPath(
-    fitted,
+    raw,
     opts.arcResMM ?? Math.min(0.20, maxSegAlong)
   );
 
-  return { segmentsForThreeJs, segmentsForGcodeFitted: fitted };
+  return { segmentsForThreeJs, segmentsForGcodeFitted: raw };
 };
 
 

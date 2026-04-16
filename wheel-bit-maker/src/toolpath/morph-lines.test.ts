@@ -4,9 +4,11 @@ import {
   DEFAULT_GCODE_SETTINGS,
   generateGCodeFromSegments,
   getRotaryAngles,
+  splitSegmentsIntoPasses,
   type GCodeSettings,
   type ToolpathSegment,
 } from './morph-lines';
+import { getPass as getWheelPass } from '../data/m0.13/wheel/index';
 
 const baseSegments: ToolpathSegment[] = [
   {
@@ -201,5 +203,29 @@ describe('generateGCodeFromSegments', () => {
     });
 
     expect(gcode).toContain('G0 A0.');
+  });
+
+  it('keeps wheel tooth pass 4 as a rasterized linear toolpath', () => {
+    const pass = getWheelPass(4)();
+    const constructed = pass.construct({
+      material: 'A2-Rough',
+      stockRadius: 3,
+      bit: pass.defaultBit,
+    });
+
+    expect(constructed.segmentsForGcodeFitted.some((seg) => seg.kind === 'arc')).toBe(false);
+
+    const passes = splitSegmentsIntoPasses(constructed.segmentsForGcodeFitted);
+    expect(passes.length).toBe(2);
+
+    const gcode = generateGCodeFromSegments({
+      material: 'A2-Rough',
+      bit: constructed.bit,
+      segments: constructed.segmentsForGcodeFitted,
+      rotation: constructed.rotation,
+    });
+
+    expect(gcode.some((line) => /^G[23]\b/.test(line))).toBe(false);
+    expect(gcode.some((line) => /^G0 X.* Z0\.000$/.test(line))).toBe(false);
   });
 });

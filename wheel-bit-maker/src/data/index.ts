@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 import * as model_0_13_Z112 from './m0.13/wheel/index';
 import * as model_0_13_z14 from './m0.13/pinion/index';
-import type { ToolpathSegment } from '../toolpath/morph-lines';
+import type { GCodeSettings, ToolpathSegment } from '../toolpath/morph-lines';
+
+export type GCodeSettingsOverrides =
+  Partial<Omit<GCodeSettings, 'safeRetract' | 'machineActions'>> & {
+    safeRetract?: Partial<GCodeSettings['safeRetract']>;
+    machineActions?: Partial<GCodeSettings['machineActions']>;
+  };
 
 
 export interface IConstructProps {
@@ -27,6 +33,7 @@ export interface IConstruction {
   name: string; 
   type: 'lines' | 'tooth'; 
   defaultBit: IBit;
+  defaultGcodeSettings?: GCodeSettingsOverrides;
   // rotation?: {
   //   mode: TRotationMode;
   //   steps: number;

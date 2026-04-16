@@ -3,10 +3,13 @@ import { createBitMesh, generatePath, generateToothPath } from "../../helpers";
 import { cloneSegment, convertPointToSegment } from "../../../helpers";
 import * as wheel from '../../../nihs_20_30/wheel'; 
 import { getLeftRight } from "../wheel";
-import type { IConstruction, IConstructProps } from '../..';
+import type { GCodeSettingsOverrides, IConstruction, IConstructProps } from '../..';
 
 export const filename = 'm=0.13 z=14.stl';
 const bits = carbideBits;
+const defaultPassSafeRetract = (safeRetract: GCodeSettingsOverrides['safeRetract']) => ({
+  safeRetract,
+});
 
 export const getHowManyPasses = () => 5;
 export const getPass = (n: number) => {
@@ -62,6 +65,7 @@ const pass0 = (): IConstruction => {
     name: "1. Rough", 
     type: 'lines',
     defaultBit: bit,
+    defaultGcodeSettings: defaultPassSafeRetract({ z: 0 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -138,6 +142,7 @@ const pass1 = (): IConstruction => {
     name: "2. Finer Rough", 
     type: 'lines',
     defaultBit: bit,
+    defaultGcodeSettings: defaultPassSafeRetract({ z: 0 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -213,6 +218,7 @@ const pass2 = (): IConstruction => {
     name: "3. Side flatten", 
     type: 'lines',
     defaultBit: bit,
+    defaultGcodeSettings: defaultPassSafeRetract({ z: 0 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -287,6 +293,7 @@ const pass3 = (): IConstruction => {
     name: "4. Relief angle", 
     type: 'lines',
     defaultBit: bit,
+    defaultGcodeSettings: defaultPassSafeRetract({ z: 0 }),
     construct: (props: IConstructProps) => {
       const { stockRadius, material } = props;
       const b: IBit = props.bit || bit;
@@ -391,6 +398,7 @@ const pass4 = (): IConstruction => {
     name: "5. Tooth", 
     type: 'tooth',
     defaultBit: bit, 
+    defaultGcodeSettings: defaultPassSafeRetract({ z: 2 }),
     construct: (props: {bit?: IBit; material: TMaterial; stockRadius: number}) => {
       const material = props.material;
       const b: IBit = props.bit || bit;

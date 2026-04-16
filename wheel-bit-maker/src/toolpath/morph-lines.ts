@@ -451,7 +451,7 @@ export function generateGCodeFromSegments(props: {
 
   const prepareForFeedMove = (target: PointXYZ) => {
     if (!lastMotionPoint) return;
-    const approachZ = Math.min(safeRetractZ, target.z + approachOffsetZ);
+    const approachZ = Math.max(target.z, Math.min(safeRetractZ, target.z + approachOffsetZ));
 
     if (!isSameXY(lastMotionPoint, target)) {
       pushG0({ x: target.x, y: target.y, z: lastMotionPoint.z });
@@ -592,6 +592,8 @@ export function splitSegmentsIntoPasses(allSegments: ToolpathSegment[]): Toolpat
   const passes: ToolpathSegment[][] = [];
   let buf: ToolpathSegment[] = [];
   let sawCutMotion = false;
+  const hasCutMotion = (segments: ToolpathSegment[]) =>
+    segments.some((seg) => seg.kind === 'plunge' || seg.kind === 'cut' || seg.kind === 'arc');
 
   allSegments.forEach(seg => {
     buf.push(seg);
@@ -608,7 +610,7 @@ export function splitSegmentsIntoPasses(allSegments: ToolpathSegment[]): Toolpat
     }
   });
 
-  if (buf.length) passes.push(buf);
+  if (buf.length && hasCutMotion(buf)) passes.push(buf);
   return passes;
 }
 

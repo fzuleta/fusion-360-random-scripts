@@ -3,7 +3,7 @@ import * as React from 'react'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import styles from './app.module.scss'
 import { STLLoader } from 'three-stdlib';
-import { models, type IConstructed, type IConstruction } from './data'; 
+import { models, type GCodeSettingsOverrides, type IConstructed, type IConstruction } from './data'; 
 import { degToRad, isNumeric, range } from './helpers';
 import { bitCatalog, getBitKey, getBitMaterials } from './helpers/carbide-bits';
 import {
@@ -13,6 +13,26 @@ import {
   generateGCodeFromSegments, 
 } from './toolpath/morph-lines';
 import { Overlay } from './components/overlay'; 
+
+const mergeGcodeSettings = (
+  base: GCodeSettings,
+  overrides?: GCodeSettingsOverrides,
+): GCodeSettings => ({
+  ...base,
+  ...overrides,
+  safeRetract: overrides?.safeRetract
+    ? {
+        ...DEFAULT_GCODE_SETTINGS.safeRetract,
+        ...overrides.safeRetract,
+      }
+    : base.safeRetract,
+  machineActions: overrides?.machineActions
+    ? {
+        ...DEFAULT_GCODE_SETTINGS.machineActions,
+        ...overrides.machineActions,
+      }
+    : base.machineActions,
+});
 
 function App() {
   const otherThingsToRenderRef = React.useRef<{[k: string]: () => unknown}>({});
@@ -26,7 +46,7 @@ function App() {
   const [modelBit, setModelBit] = React.useState(models[Object.keys(models)[0]]);
   const [pass, setPass] = React.useState<IConstruction | undefined>(undefined);
   const [constructed, setConstructed] = React.useState<IConstructed | undefined>(undefined);
-  const [showMachinePreview, setShowMachinePreview] = React.useState(false);
+  const [showMachinePreview, setShowMachinePreview] = React.useState(true);
   const [gcodeSettings, setGcodeSettings] = React.useState<GCodeSettings>(DEFAULT_GCODE_SETTINGS);
   const [debouncedGcodeSettings, setDebouncedGcodeSettings] = React.useState<GCodeSettings>(DEFAULT_GCODE_SETTINGS);
   // const [lines, setLines] = React.useState<ILinesGotten>();
@@ -420,6 +440,7 @@ function App() {
     if (!modelBit) { return; }
     const nextPass = modelBit.getPass(passNum)();
     setPass(nextPass);
+    setGcodeSettings(current => mergeGcodeSettings(current, nextPass.defaultGcodeSettings));
     const defaultBitKey = getBitKey(nextPass.defaultBit);
     if (defaultBitKey) {
       setSelectedBitKey(defaultBitKey);
