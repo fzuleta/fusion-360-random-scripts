@@ -85,8 +85,8 @@ export const bit3_175mm_3_flute_aluminum: IBit = {
     },
     'brass-Finish': {
       spindleSpeed: 11000,
-      feedRate: 450,
-      stepOver: 0.1,
+      feedRate: 300,
+      stepOver: 0.05,
     }
   }
 }

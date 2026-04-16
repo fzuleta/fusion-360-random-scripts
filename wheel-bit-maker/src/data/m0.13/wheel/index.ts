@@ -130,7 +130,7 @@ const pass0 = (): IConstruction => {
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
-          steps: 360 / 8, // every 4 degrees
+          steps: 360 / 12, // 45 indexed cuts = 8° per rotation step
           startAngle: 0, 
           endAngle: 360
         }, 
@@ -290,7 +290,7 @@ const pass1 = (): IConstruction => {
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
-          steps: 360 / 8,  // every 5 degrees
+          steps: 360 / 8,  // 45 indexed cuts = 8° per rotation step
           startAngle: 0, 
           endAngle: 360
         }, 
