@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GCODE_SETTINGS,
   generateGCodeFromSegments,
+  getRotaryAngles,
   type GCodeSettings,
   type ToolpathSegment,
 } from './morph-lines';
@@ -39,6 +40,24 @@ const makeBit = (spindleSpeed?: number): IBit => ({
 });
 
 describe('generateGCodeFromSegments', () => {
+  it('includes the configured end angle on partial rotary sweeps', () => {
+    expect(getRotaryAngles({
+      mode: 'repeatPassOverRotation',
+      steps: 9,
+      startAngle: 0,
+      endAngle: -245,
+    })).toEqual([0, -30.625, -61.25, -91.875, -122.5, -153.125, -183.75, -214.375, -245]);
+  });
+
+  it('avoids duplicating the start angle on full-turn sweeps', () => {
+    expect(getRotaryAngles({
+      mode: 'repeatPassOverRotation',
+      steps: 45,
+      startAngle: 0,
+      endAngle: 360,
+    }).at(-1)).toBe(352);
+  });
+
   it('matches the default golden output for the machine-specific post', () => {
     const gcode = generateGCodeFromSegments({
       material: 'A2-Rough',

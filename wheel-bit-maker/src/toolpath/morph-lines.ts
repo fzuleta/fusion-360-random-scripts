@@ -24,6 +24,31 @@ type RotationConfig = {
   angleAfterCompleted?: number;
 };
 
+const FULL_TURN_DEGREES = 360;
+const ROTATION_EPSILON = 1e-9;
+
+const isWholeTurnSweep = (totalAngle: number) =>
+  Math.abs(Math.abs(totalAngle) - FULL_TURN_DEGREES) <= ROTATION_EPSILON;
+
+export function getRotaryAngles(rotation?: RotationConfig): number[] {
+  if (!rotation) return [0];
+
+  if (!Number.isFinite(rotation.steps) || !Number.isInteger(rotation.steps) || rotation.steps <= 0) {
+    throw new Error(`rotation.steps must be a positive integer, got ${rotation.steps}`);
+  }
+
+  if (rotation.steps === 1) {
+    return [rotation.startAngle];
+  }
+
+  const totalAngle = rotation.endAngle - rotation.startAngle;
+  const includeEndAngle = Math.abs(totalAngle) > ROTATION_EPSILON && !isWholeTurnSweep(totalAngle);
+  const divisor = includeEndAngle ? rotation.steps - 1 : rotation.steps;
+  const angleStep = divisor === 0 ? 0 : totalAngle / divisor;
+
+  return Array.from({ length: rotation.steps }, (_, step) => rotation.startAngle + step * angleStep);
+}
+
 export interface MachineActionSettings {
   homeZBeforeStart: boolean;
   homeZAfterEnd: boolean;
@@ -313,12 +338,7 @@ export function generateGCodeFromSegments(props: {
   settings?: GCodeSettings;
 }): string[] {
   const { bit, material, segments, rotation, settings } = props;
-
-  if (rotation) {
-    if (!Number.isFinite(rotation.steps) || !Number.isInteger(rotation.steps) || rotation.steps <= 0) {
-      throw new Error(`rotation.steps must be a positive integer, got ${rotation.steps}`);
-    }
-  }
+  const rotaryAngles = getRotaryAngles(rotation);
 
   const materialSpindleSpeed = bit.material[material]?.spindleSpeed;
   if (settings?.spindleSpeed !== undefined && (!Number.isFinite(settings.spindleSpeed) || settings.spindleSpeed <= 0)) {
@@ -386,12 +406,10 @@ export function generateGCodeFromSegments(props: {
 
   const hasRotary   = !!rotation;
   const aStart = rotation?.startAngle ?? 0;
-  const aEnd = rotation?.endAngle ?? 360;
-  const totalAngle = aEnd - aStart;
-  const angleStep = hasRotary ? totalAngle / rotation.steps : 0;
+  const firstRotaryAngle = rotaryAngles[0] ?? aStart;
 
   if (hasRotary) {
-    gcode.push(`G0 A${aStart.toFixed(3)}    ; set rotary start`);
+    gcode.push(`G0 A${firstRotaryAngle.toFixed(3)}    ; set rotary start`);
   }
 
   const isSamePoint = (a: PointXYZ, b: PointXYZ) =>
@@ -491,8 +509,7 @@ export function generateGCodeFromSegments(props: {
 
   if (!rotation || rotation.mode === 'fullPassPerRotation') {
     // ---- Original behaviour: do full path, then rotate ----
-    for (let step = 0; step < (hasRotary ? rotation.steps : 1); step++) {
-      const currentAngle = aStart + step * angleStep;
+    for (const currentAngle of rotaryAngles) {
       if (hasRotary) {
         retractForRotaryIndex();
         gcode.push(`G0 A${currentAngle.toFixed(3)}`);
@@ -509,12 +526,12 @@ export function generateGCodeFromSegments(props: {
       throw new Error(`onePassPerRotation requires passes (${totalPasses}) to equal rotation.steps (${requiredSteps})`);
     }
 
-    let currentAngle = aStart;
-
     passes.forEach((pass, idx) => {
+      const currentAngle = rotaryAngles[idx] ?? firstRotaryAngle;
       if (idx > 0 && hasRotary) {
-        // Advance BEFORE starting the next pass
-        currentAngle += angleStep;
+        retractForRotaryIndex();
+        gcode.push(`G0 A${currentAngle.toFixed(3)}`);
+      } else if (idx === 0 && hasRotary) {
         retractForRotaryIndex();
         gcode.push(`G0 A${currentAngle.toFixed(3)}`);
       }
@@ -530,10 +547,9 @@ export function generateGCodeFromSegments(props: {
       if (hasRotary) {
         // Always start each pass at the base angle
         retractForRotaryIndex();
-        gcode.push(`G0 A${aStart.toFixed(3)}    ; pass ${passIdx+1} reset`);
+        gcode.push(`G0 A${firstRotaryAngle.toFixed(3)}    ; pass ${passIdx+1} reset`);
       }
-      for (let step = 0; step < (hasRotary ? rotation.steps : 1); step++) {
-        const angle = aStart + step * angleStep;
+      for (const angle of rotaryAngles) {
         if (hasRotary) {
           retractForRotaryIndex();
           gcode.push(`G0 A${angle.toFixed(3)}`);
@@ -610,12 +626,7 @@ export function buildMachinePreviewPath(props: {
     approachOffsetZ = 1,
     arcRes = 0.2,
   } = props;
-
-  if (rotation) {
-    if (!Number.isFinite(rotation.steps) || !Number.isInteger(rotation.steps) || rotation.steps <= 0) {
-      throw new Error(`rotation.steps must be a positive integer, got ${rotation.steps}`);
-    }
-  }
+  const rotaryAngles = getRotaryAngles(rotation);
 
   const out: TVector3[] = [];
   let lastMotionPoint: PointXYZ | undefined;
@@ -735,14 +746,9 @@ export function buildMachinePreviewPath(props: {
   };
 
   const hasRotary = !!rotation;
-  const aStart = rotation?.startAngle ?? 0;
-  const aEnd = rotation?.endAngle ?? 360;
-  const totalAngle = aEnd - aStart;
-  const angleStep = hasRotary ? totalAngle / rotation.steps : 0;
 
   if (!rotation || rotation.mode === 'fullPassPerRotation') {
-    for (let step = 0; step < (hasRotary ? rotation.steps : 1); step++) {
-      const currentAngle = aStart + step * angleStep;
+    for (const currentAngle of rotaryAngles) {
       if (hasRotary) {
         retractForRotaryIndex();
       }
@@ -753,26 +759,23 @@ export function buildMachinePreviewPath(props: {
     if (passes.length !== rotation.steps) {
       throw new Error(`onePassPerRotation requires passes (${passes.length}) to equal rotation.steps (${rotation.steps})`);
     }
-
-    let currentAngle = aStart;
     passes.forEach((pass, idx) => {
       if (idx > 0) {
-        currentAngle += angleStep;
         retractForRotaryIndex();
       }
+      const currentAngle = rotaryAngles[idx] ?? rotaryAngles[0] ?? 0;
       pass.forEach(seg => emitSegmentAtAngle(seg, currentAngle));
     });
   } else if (rotation.mode === 'repeatPassOverRotation') {
     const passes = splitSegmentsIntoPasses(segments);
     passes.forEach((pass) => {
       retractForRotaryIndex();
-      for (let step = 0; step < rotation.steps; step++) {
-        const angle = aStart + step * angleStep;
+      rotaryAngles.forEach((angle, step) => {
         if (step > 0) {
           retractForRotaryIndex();
         }
         pass.forEach(seg => emitSegmentAtAngle(seg, angle));
-      }
+      });
     });
   } else {
     segments.forEach(seg => emitSegmentAtAngle(seg, 0));

@@ -2,7 +2,7 @@ import React from 'react';
 import * as THREE from 'three'; 
 import styles from './overlay.module.scss'; 
 import type { IConstructed } from '../data';
-import type { GCodeSettings } from '../toolpath/morph-lines';
+import { getRotaryAngles, type GCodeSettings } from '../toolpath/morph-lines';
 
 interface IProps {
   constructed?: IConstructed,
@@ -386,6 +386,11 @@ return segments.length === 0 ? <></> : (
   );
 }
 const Rotation=(props: IProps) => {
+  const rotaryAngles = props.constructed?.rotation ? getRotaryAngles(props.constructed.rotation) : [];
+  const indexedStartAngle = rotaryAngles[0];
+  const indexedEndAngle = rotaryAngles.at(-1);
+  const indexedStep = rotaryAngles.length > 1 ? rotaryAngles[1] - rotaryAngles[0] : undefined;
+
    return <details className={styles.accordion} open>
     <summary className={styles.summary}>🌀 Rotation Info</summary>
     <div className={styles.accordionContent}>  
@@ -405,6 +410,18 @@ const Rotation=(props: IProps) => {
         <strong>Steps:</strong> {props.constructed.rotation.steps}
         <br />
         <strong>Angle Range:</strong> {props.constructed.rotation.startAngle}° to {props.constructed.rotation.endAngle}°
+        {indexedStartAngle !== undefined && indexedEndAngle !== undefined && (
+          <>
+            <br />
+            <strong>Indexed Range:</strong> {indexedStartAngle.toFixed(3)}° to {indexedEndAngle.toFixed(3)}°
+          </>
+        )}
+        {indexedStep !== undefined && (
+          <>
+            <br />
+            <strong>Indexed Step:</strong> {indexedStep.toFixed(3)}°
+          </>
+        )}
         {props.constructed.rotation.angleAfterCompleted !== undefined && (
           <>
             <br />
