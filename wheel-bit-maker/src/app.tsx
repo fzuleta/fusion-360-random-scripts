@@ -438,7 +438,17 @@ function App() {
 
   React.useEffect(() => {
     if (!modelBit) { return; }
-    const nextPass = modelBit.getPass(passNum)();
+    const passCount = modelBit.getHowManyPasses();
+    if (passCount <= 0) {
+      setPass(undefined);
+      return;
+    }
+    const safePassNum = Math.min(passNum, passCount - 1);
+    if (safePassNum !== passNum) {
+      setPassNum(safePassNum);
+      return;
+    }
+    const nextPass = modelBit.getPass(safePassNum)();
     setPass(nextPass);
     setGcodeSettings(current => mergeGcodeSettings(current, nextPass.defaultGcodeSettings));
     const defaultBitKey = getBitKey(nextPass.defaultBit);

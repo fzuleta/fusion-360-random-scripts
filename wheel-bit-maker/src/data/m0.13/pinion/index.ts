@@ -30,7 +30,7 @@ const defaultPassPostSettings = ({
   },
 });
 
-export const getHowManyPasses = () => 6;
+export const getHowManyPasses = () => 5;
 export const getPass = (n: number) => {
   switch (n){
     case 0: return pass0; 
@@ -42,8 +42,6 @@ export const getPass = (n: number) => {
       throw new Error('Pass doesnt exist');
   }
 }
- 
-const offset = {y: 1.5}
 const pass0 = (): IConstruction => { 
   const bit = bits.bit3_175mm_4_flute_chino;
   const cutZ = -0.5;
@@ -56,10 +54,10 @@ const pass0 = (): IConstruction => {
   ];
   const lineB =  // rough: leave extra support, only mill down to 1.1 mm here
     [
-      { x: 3, y: 1.303, z },
-      { x: -0.45, y: 1.303, z },
-      { x: -0.45, y: 0.7, z },
-      { x: -15, y: 0.7, z },
+      { x: 3, y: 2.7, z },
+      { x: -0.6, y: 2.7, z },
+      { x: -0.6, y: 2.0, z },
+      { x: -15, y: 2.0, z },
       { x: -17, y: 0, z }// y: stockRadius + bitRadius
   ];
    
@@ -129,16 +127,16 @@ const pass1 = (): IConstruction => {
   const z = cutZ; 
   
     const lineA = [ // the border of the stock
-      { x: 0, y: 1.5, z }, 
-      { x: -3.0, y: 1.5, z }
+    { x: 1, y: 3, z }, 
+    { x: -3.0, y: 3, z }
+  ];
+  const lineB =  // the inner profile
+    [
+      { x: 1, y: 2.7, z },
+      { x: -0.547, y: 2.7, z },
+      { x: -0.547, y: 2.0, z },
+      { x: -3, y: 2.0, z }, 
     ];
-    const lineB =  // the inner profile
-      [
-        { x: 0, y: 1.298, z },
-        { x: -0.45, y: 1.298, z },
-        { x: -0.45, y: 0.7, z },
-        { x: -3, y: 0.7, z }, 
-      ];
 
   const applyBitRadiusAndStockRadius = (bitRadius: number, stockRadius: number) => {
     const lA = JSON.parse(JSON.stringify(lineA));
