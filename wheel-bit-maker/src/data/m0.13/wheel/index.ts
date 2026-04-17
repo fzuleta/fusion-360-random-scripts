@@ -33,11 +33,10 @@ const defaultPassPostSettings = ({
 export const getHowManyPasses = () => 5;
 export const getPass = (n: number) => {
   switch (n){
-    case 0: return pass0; 
+    case 0: return pass0;  
     case 1: return pass1;
     case 2: return pass2;
     case 3: return pass3;
-    case 4: return pass4;
     default:
       throw new Error('Pass doesnt exist');
   }
@@ -154,82 +153,6 @@ const pass0 = (): IConstruction => {
 } 
 
 const pass1 = (): IConstruction => { 
-  const bit = bits.bit3_175mm_4_flute_chino;  
-  const cutZ = -0.5; 
-  const z = cutZ; 
-  
-  const lineA = [ // the border of the stock
-    { x: 1, y: 3, z }, 
-    { x: -3.0, y: 3, z }
-  ];
-  const lineB =  // the inner profile
-    [
-      { x: 1, y: 2.7, z },
-      { x: -0.547, y: 2.7, z },
-      { x: -0.547, y: 2.0, z },
-      { x: -3, y: 2.0, z }, 
-    ];
-
-  const applyBitRadiusAndStockRadius = (bitRadius: number, stockRadius: number) => {
-    const lA = JSON.parse(JSON.stringify(lineA));
-    const lB = JSON.parse(JSON.stringify(lineB)); 
-    void stockRadius;
-
-    lA.forEach((it: any) => it.y += bitRadius);
-
-    let i = 0;
-    i=0;  lB[i].y += bitRadius;
-    i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
-    i++;  lB[i].x -= bitRadius; lB[i].y += bitRadius;
-    i++;  lB[i].x += bitRadius; lB[i].y += bitRadius;
-    return {
-      lineA: lA,
-      lineB: lB,
-    }
-  }
-
-  return {
-    name: "1. Finer Rough 🚫", 
-    type: 'lines',
-    defaultBit: bit,
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),
-    construct: (props: IConstructProps) => {
-      const { stockRadius, material } = props;
-      const b: IBit = props.bit || bit;
-      const bitRadius = b.diameter * 0.5; 
-      const bitMesh = createBitMesh(b); 
-      const matProps = b.material[material];
-      if (!matProps) { 
-        alert('Material not found'); 
-        throw new Error('Material not found')
-      }
-      const {lineA, lineB} = applyBitRadiusAndStockRadius(bitRadius, stockRadius);
-      return {
-        bit: b,
-        bitMesh,
-        rotation: {
-          mode: 'repeatPassOverRotation',
-          steps: 360 / 8,  // 45 indexed cuts = 8° per rotation step
-          startAngle: 0, 
-          endAngle: 360
-        }, 
-        ...generatePath({
-          stepOver: matProps.stepOver, 
-          stepOverIsMM: true,
-          alongMaxSegMM: 0.015,
-          arcResMM: 0.01,
-          lineA, 
-          lineB, 
-          stockRadius, 
-          bit: b,
-          feedRate: matProps.feedRate, 
-          cutZ,
-        }),
-      }
-    },
-  }
-} 
-const pass2 = (): IConstruction => { 
   const bit = bits.bit3_175mm_4_flute_chino;   
   const cutZ= 0;
   const z = cutZ; 
@@ -264,7 +187,7 @@ const pass2 = (): IConstruction => {
   }
 
   return {
-    name: "2. Side flatten", 
+    name: "1. Side flatten", 
     type: 'lines',
     defaultBit: bit,
     defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),
@@ -284,9 +207,9 @@ const pass2 = (): IConstruction => {
         bitMesh,
         rotation: {
           mode: 'repeatPassOverRotation',
-          steps: 90 / 10,  // every 5 degrees
+          steps: 90 / 10,  // 
           startAngle: 0, 
-          endAngle: -245
+          endAngle: -360-50.22
         }, 
         ...generatePath({
           stepOver: matProps.stepOver, 
@@ -304,18 +227,22 @@ const pass2 = (): IConstruction => {
     },
   }
 } 
-const pass3 = (): IConstruction => { 
+const pass2 = (): IConstruction => { 
   const bit = bits.bit3_175mm_4_flute_chino; 
   const cutZ= 0.68;
   const z = cutZ; 
   
-  const lineA = [ // the inner profile
-      { x: 2,       y: 0.165,   z },
-      { x: 0,       y: 0.165,   z },
+  const lineA = [
+      { x: 2.0,     y: 0,   z },
+      { x: 0,       y: 0,   z },
+      { x: -2.0,    y: 0.21,   z },
+
+
+
       { x: -0.418,  y: 0.209,   z },   
       { x: -3,  y: 0.209,   z },
     ];
-  const lineB = [ // the border of the stock
+  const lineB = [
     { x: -3,  y: -2,   z },
     { x: 2,  y: -2,   z },
   ]; 
@@ -338,7 +265,7 @@ const pass3 = (): IConstruction => {
     }
   }
   return {
-    name: "3. Relief angle", 
+    name: "2. Relief angle", 
     type: 'lines',
     defaultBit: bit,
     defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: -0.500 }),
@@ -373,7 +300,7 @@ const pass3 = (): IConstruction => {
     },
   }
 } 
-const pass4 = (): IConstruction => { 
+const pass3 = (): IConstruction => { 
   const bit = bits.bit3_175mm_4_flute_chino; 
   const bottomCut = -0.6
 
@@ -443,7 +370,7 @@ const pass4 = (): IConstruction => {
   }
 
   return {
-    name: "4. Tooth", 
+    name: "3. Tooth", 
     type: 'tooth',
     defaultBit: bit, 
     defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 2 }),
