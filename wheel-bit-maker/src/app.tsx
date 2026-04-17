@@ -34,6 +34,17 @@ const mergeGcodeSettings = (
     : base.machineActions,
 });
 
+type AxisName = 'x' | 'y' | 'z';
+
+const AXIS_VIEWS: Array<{ label: string; axis: AxisName; direction: 1 | -1 }> = [
+  { label: '+X', axis: 'x', direction: 1 },
+  { label: '-X', axis: 'x', direction: -1 },
+  { label: '+Y', axis: 'y', direction: 1 },
+  { label: '-Y', axis: 'y', direction: -1 },
+  { label: '+Z', axis: 'z', direction: 1 },
+  { label: '-Z', axis: 'z', direction: -1 },
+];
+
 function App() {
   const otherThingsToRenderRef = React.useRef<{[k: string]: () => unknown}>({});
   const [passNum, setPassNum] = React.useState(0);
@@ -47,6 +58,7 @@ function App() {
   const [pass, setPass] = React.useState<IConstruction | undefined>(undefined);
   const [constructed, setConstructed] = React.useState<IConstructed | undefined>(undefined);
   const [showMachinePreview, setShowMachinePreview] = React.useState(true);
+  const [showComparisonProfiles, setShowComparisonProfiles] = React.useState(true);
   const [gcodeSettings, setGcodeSettings] = React.useState<GCodeSettings>(DEFAULT_GCODE_SETTINGS);
   const [debouncedGcodeSettings, setDebouncedGcodeSettings] = React.useState<GCodeSettings>(DEFAULT_GCODE_SETTINGS);
   // const [lines, setLines] = React.useState<ILinesGotten>();
@@ -55,6 +67,7 @@ function App() {
   const mountRef = React.useRef<HTMLDivElement>(null);
   const sceneRef = React.useRef<THREE.Scene | undefined>(undefined);
   const toolpathGroupRef = React.useRef<THREE.Group | null>(null); 
+  const cameraRef = React.useRef<THREE.OrthographicCamera | null>(null);
   const orbitControlsRef = React.useRef<OrbitControls | undefined>(undefined);
   const animationFrameRef = React.useRef<number | null>(null);
   const drawRef = React.useRef<() => void>(() => {});
@@ -80,6 +93,35 @@ function App() {
     return selectedBit.material[resolvedMaterial]?.spindleSpeed;
   }, [resolvedMaterial, selectedBit]);
   const defaultToolNumber = React.useMemo(() => selectedBit?.toolNumber, [selectedBit]);
+  const hasComparisonProfiles = React.useMemo(
+    () => Boolean(constructed?.comparisonProfiles?.some((profile) => profile.length > 1)),
+    [constructed],
+  );
+
+  const snapToAxisView = React.useCallback((axis: AxisName, direction: 1 | -1) => {
+    const camera = cameraRef.current;
+    const controls = orbitControlsRef.current;
+
+    if (!camera || !controls) {
+      return;
+    }
+
+    const target = controls.target.clone();
+    const distance = Math.max(camera.position.distanceTo(target), 1);
+    const viewDirection = new THREE.Vector3(
+      axis === 'x' ? direction : 0,
+      axis === 'y' ? direction : 0,
+      axis === 'z' ? direction : 0,
+    );
+    const upVector = axis === 'z'
+      ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(0, 0, 1);
+
+    camera.position.copy(target).addScaledVector(viewDirection, distance);
+    camera.up.copy(upVector);
+    camera.lookAt(target);
+    controls.update();
+  }, []);
 
   React.useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -250,6 +292,10 @@ function App() {
       const line = new THREE.Line(geo, mat);
       toolpathGroupRef.current.add(line);
 
+      if (showComparisonProfiles) {
+        drawComparisonProfiles(constructed.comparisonProfiles);
+      }
+
       if (!showMachinePreview) {
         drawRotaryVisual(constructed.originalLines, constructed.rotation);
       }
@@ -322,6 +368,24 @@ function App() {
       default:
         console.warn("Unknown rotation mode:", rotation.mode);
     }
+  };
+  const drawComparisonProfiles = (comparisonProfiles?: PointXYZ[][]) => {
+    if (!toolpathGroupRef.current || !comparisonProfiles?.length) {
+      return;
+    }
+
+    comparisonProfiles
+      .filter((profile) => profile.length > 1)
+      .forEach((profile) => {
+        const pts = profile.map((point) => new THREE.Vector3(point.x, point.y + 0.01, point.z));
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        const mat = new THREE.LineBasicMaterial({
+          color: 0x3399ff,
+          transparent: true,
+          opacity: 0.95,
+        });
+        toolpathGroupRef.current?.add(new THREE.Line(geo, mat));
+      });
   };
   const drawFullPassPerRotation = (segments: TVector3[], rotation: IConstructed["rotation"]) => {
     if (!rotation) { return; }
@@ -482,7 +546,7 @@ function App() {
     console.log("Changing constructed to: ", constructed)
     if (!sceneRef.current || !pass || !constructed) return;
     drawRef.current();
-  }, [constructed, debouncedGcodeSettings, pass, showMachinePreview]);
+  }, [constructed, debouncedGcodeSettings, pass, showComparisonProfiles, showMachinePreview]);
   React.useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -508,6 +572,7 @@ function App() {
       0.1,
       1000
     );
+    cameraRef.current = camera;
     camera.position.set(30, -30, 100)
     camera.lookAt(0, 0, 0)
     camera.zoom = 5;                 // higher = closer
@@ -554,6 +619,7 @@ function App() {
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      cameraRef.current = null;
       controls.dispose();
       renderer.dispose();
       if (mount.contains(renderer.domElement)) {
@@ -729,6 +795,28 @@ return (
           />
           &nbsp;Exact machine preview
         </label>
+        <label style={{ marginLeft: 12, opacity: hasComparisonProfiles ? 1 : 0.5 }}>
+          <input
+            type="checkbox"
+            checked={showComparisonProfiles}
+            disabled={!hasComparisonProfiles}
+            onChange={(e) => setShowComparisonProfiles(e.target.checked)}
+          />
+          &nbsp;Profile overlay
+        </label>
+        <div className={styles.viewControls}>
+          <span className={styles.viewLabel}>View</span>
+          {AXIS_VIEWS.map((view) => (
+            <button
+              key={view.label}
+              type="button"
+              className={styles.viewButton}
+              onClick={() => snapToAxisView(view.axis, view.direction)}
+            >
+              {view.label}
+            </button>
+          ))}
+        </div>
       </div>
       {/* full‑width scrub slider on its own line */}
       <div style={{ width: '100%', marginTop: 4, display: 'flex' }}>

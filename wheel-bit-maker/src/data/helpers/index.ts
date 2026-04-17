@@ -83,6 +83,79 @@ export const convertLinesToVector3s = (line: PointXYZ[]) => {
   return path;
 }
 
+export const tessellateToothProfile = (
+  profile: ITeethPoint[],
+  arcRes = 0.01,
+): PointXYZ[] => {
+  if (!profile.length) {
+    return [];
+  }
+
+  const out: PointXYZ[] = [];
+  const pushPoint = (point: PointXYZ) => {
+    const last = out.at(-1);
+    if (
+      last &&
+      Math.abs(last.x - point.x) < 1e-9 &&
+      Math.abs(last.y - point.y) < 1e-9 &&
+      Math.abs(last.z - point.z) < 1e-9
+    ) {
+      return;
+    }
+    out.push({ x: point.x, y: point.y, z: point.z });
+  };
+
+  for (const segment of profile) {
+    pushPoint(segment.from);
+
+    if (!segment.center) {
+      pushPoint(segment.to);
+      continue;
+    }
+
+    const radius = Math.hypot(
+      segment.from.x - segment.center.x,
+      segment.from.z - segment.center.z,
+    );
+    const startAngle = Math.atan2(
+      segment.from.z - segment.center.z,
+      segment.from.x - segment.center.x,
+    );
+    const endAngle = Math.atan2(
+      segment.to.z - segment.center.z,
+      segment.to.x - segment.center.x,
+    );
+
+    const fromVectorX = segment.from.x - segment.center.x;
+    const fromVectorZ = segment.from.z - segment.center.z;
+    const toVectorX = segment.to.x - segment.center.x;
+    const toVectorZ = segment.to.z - segment.center.z;
+    const anticlockwise = (fromVectorX * toVectorZ) - (fromVectorZ * toVectorX) > 0;
+
+    let span = endAngle - startAngle;
+    if (anticlockwise) {
+      if (span < 0) {
+        span += 2 * Math.PI;
+      }
+    } else if (span > 0) {
+      span -= 2 * Math.PI;
+    }
+
+    const steps = Math.min(200, Math.max(2, Math.ceil((radius * Math.abs(span)) / arcRes)));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const angle = startAngle + span * t;
+      pushPoint({
+        x: segment.center.x + radius * Math.cos(angle),
+        y: segment.from.y + (segment.to.y - segment.from.y) * t,
+        z: segment.center.z + radius * Math.sin(angle),
+      });
+    }
+  }
+
+  return out;
+}
+
 export function buildRasterPath(
   posList: PointXYZ[][],
   yOffset: number,

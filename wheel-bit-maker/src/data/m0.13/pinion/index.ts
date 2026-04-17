@@ -1,5 +1,5 @@
 import * as carbideBits from "../../../helpers/carbide-bits";
-import { createBitMesh, generatePath, generateToothPath } from "../../helpers";
+import { createBitMesh, generatePath, generateToothPath, tessellateToothProfile } from "../../helpers";
 import { cloneSegment, convertPointToSegment } from "../../../helpers";
 import * as wheel from '../../../nihs_20_30/wheel'; 
 import { getLeftRight } from "../wheel";
@@ -348,7 +348,7 @@ const pass4 = (): IConstruction => {
   const bit = bits.bit3_175mm_4_flute_chino; 
   const bottomCut = -0.6
 
-  const _points: Segment[] = [
+  const toothProfile: ITeethPoint[] = [
     { // left base
       from: { x: -1,      y: 0,               z: bottomCut },
       to:   { x: -0.223,  y: 0,               z: bottomCut },
@@ -393,18 +393,30 @@ const pass4 = (): IConstruction => {
       from: { x: 0.223,   y: 0,               z: bottomCut - 0.1 },
       to:   { x: -1,      y: 0,               z: bottomCut - 0.1 },
     },
-  ].map(it => {
+  ];
+
+  const translatedProfile = toothProfile.map((segment) => {
     const offsetX = -0.209; // half of the tooth width
     const offsetY = 0;
     const offsetZ = 1.2970; // this is the height of the tooth from center of wheel to top
-    [it.from, it.to, it.center].forEach(k => {
+    const translated: ITeethPoint = {
+      from: { ...segment.from },
+      to: { ...segment.to },
+      ...(segment.center ? { center: { ...segment.center } } : {}),
+    };
+
+    [translated.from, translated.to, translated.center].forEach(k => {
       if (!k) { return; }
       k.x += offsetX;
       k.y += offsetY; 
       k.z += offsetZ;
-    })
-    return convertPointToSegment(it);
+    });
+
+    return translated;
   });
+
+  const comparisonProfile = tessellateToothProfile(translatedProfile, 0.01);
+  const _points: Segment[] = translatedProfile.map((segment) => convertPointToSegment(segment));
 
   const {left, right} = getLeftRight(0.5, _points);
   const points: ISegments = {
@@ -447,6 +459,7 @@ const pass4 = (): IConstruction => {
         segmentsForThreeJs,
         segmentsForGcodeFitted,
         originalLines: [[], path],
+        comparisonProfiles: [comparisonProfile],
         rotation: {
           mode: 'repeatPassOverRotation',
           steps: 45 / 3, 

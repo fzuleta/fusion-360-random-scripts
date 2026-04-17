@@ -124,7 +124,7 @@ const PostSettings = (props: IProps) => {
     }));
   };
 
-  return <details className={styles.accordion} open>
+  return <details className={styles.accordion}>
     <summary className={styles.summary}>Post Settings</summary>
     <div className={styles.accordionContent}>
       <div className={styles.inputGroup}>
@@ -438,7 +438,7 @@ const Rotation=(props: IProps) => {
   const indexedEndAngle = rotaryAngles.at(-1);
   const indexedStep = rotaryAngles.length > 1 ? rotaryAngles[1] - rotaryAngles[0] : undefined;
 
-   return <details className={styles.accordion} open>
+  return <details className={styles.accordion}>
     <summary className={styles.summary}>🌀 Rotation Info</summary>
     <div className={styles.accordionContent}>  
   
