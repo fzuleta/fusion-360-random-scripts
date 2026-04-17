@@ -20,6 +20,7 @@ export interface IConstructed {
   segmentsForThreeJs: any[];
   segmentsForGcodeFitted: ToolpathSegment[];
   originalLines: PointXYZ[][];
+  comparisonProfiles?: PointXYZ[][];
   bitMesh: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial, THREE.Object3DEventMap>;
   rotation?: {
     mode: TRotationMode;
