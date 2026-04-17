@@ -312,7 +312,7 @@ const pass2 = (): IConstruction => {
     },
   }
 } 
-const pass3 = (): IConstruction => {  
+const pass3 = (): IConstruction => {
   const bit = bits.bit3_175mm_3_flute_aluminum; 
   const bottomCut = 2.0;
   const tipX = -0.34;
