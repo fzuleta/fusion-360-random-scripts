@@ -77,20 +77,33 @@ export const getLeftRight = (offsetX: number = 0.5, _points: Segment[]) => {
   p0.to = p0.from.clone();
   p0.from = p0.from.clone().add(new THREE.Vector3(offsetX, 0, 0));
   right.unshift(p0);
-  // poin 
-  p0 = cloneSegment(right[right.length-1]);
-  delete p0.center;
-  p0.from = p0.to.clone(); 
-  p0.to = p0.to.clone().sub(new THREE.Vector3(0.05, 0 ,0))
-  right.push(convertPointToSegment(p0));
 
   return {left, right};
+}
+
+export const appendTipCleanupToRightFlank = (
+  left: Segment[],
+  right: Segment[],
+  cleanupLength: number,
+) => {
+  const tipPoint = left.at(-1)?.to;
+  if (!tipPoint) {
+    throw new Error('Could not determine tooth tip for cleanup pass');
+  }
+
+  return [
+    ...right,
+    convertPointToSegment({
+      from: { x: tipPoint.x, y: tipPoint.y, z: tipPoint.z },
+      to: { x: tipPoint.x + cleanupLength, y: tipPoint.y, z: tipPoint.z },
+    }),
+  ];
 }
 const pass0 = (): IConstruction => { 
   const bit = bits.bit3_175mm_3_flute_aluminum;
   const cutZ = -0.5;
   const z = cutZ;
-  const stockDepth = -9;
+  const stockDepth = -11;
   const stockRampDepth = stockDepth-0.3;
   // console.log('Getting m0.13 Z112') 
   const lineA = [ // the border of the stock
@@ -315,6 +328,7 @@ const pass3 = (): IConstruction => {
   const bit = bits.bit3_175mm_3_flute_aluminum; 
   const bottomCut = 2.0;
   const tipX = -0.34;
+  const tipCleanupLength = -0.1;
 
   const translateX = (pt: PointXYZ): PointXYZ => ({
     ...pt,
@@ -395,10 +409,12 @@ const pass3 = (): IConstruction => {
   });
 
   const {left, right} = getLeftRight(0.5, _points);
+  const rightWithTipCleanup = appendTipCleanupToRightFlank(left, right, tipCleanupLength);
+
   const points: ISegments = {
     all: _points.map(it => convertPointToSegment(cloneSegment(it))),
     left,
-    right,
+    right: rightWithTipCleanup,
   }
 
   return {

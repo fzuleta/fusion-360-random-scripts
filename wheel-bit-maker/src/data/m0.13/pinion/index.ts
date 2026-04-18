@@ -2,7 +2,7 @@ import * as carbideBits from "../../../helpers/carbide-bits";
 import { createBitMesh, generatePath, generateToothPath, tessellateToothProfile } from "../../helpers";
 import { cloneSegment, convertPointToSegment } from "../../../helpers";
 import * as wheel from '../../../nihs_20_30/wheel'; 
-import { getLeftRight } from "../wheel";
+import { appendTipCleanupToRightFlank, getLeftRight } from "../wheel";
 import type { GCodeSettingsOverrides, IConstruction, IConstructProps } from '../..';
 
 export const filename = 'm=0.13 z=14.stl';
@@ -347,6 +347,7 @@ const pass3 = (): IConstruction => {
 const pass4 = (): IConstruction => { 
   const bit = bits.bit3_175mm_4_flute_chino; 
   const bottomCut = -0.6
+  const tipCleanupLength = 0.015;
 
   const toothProfile: ITeethPoint[] = [
     { // left base
@@ -422,7 +423,7 @@ const pass4 = (): IConstruction => {
   const points: ISegments = {
     all: _points.map(it => convertPointToSegment(cloneSegment(it))),
     left,
-    right,
+    right: appendTipCleanupToRightFlank(left, right, tipCleanupLength),
   }
 
   return {
