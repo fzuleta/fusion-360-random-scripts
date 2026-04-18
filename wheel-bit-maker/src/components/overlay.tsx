@@ -324,7 +324,7 @@ const Segments = (props: IProps) => {
     startRefs.current = [];
     endRefs.current = [];
 
-    const makeMarker = (p: PointXYZ, color: number, type: 'start' | 'end', index: number, size=0.05) => {
+    const makeMarker = (p: PointXYZ, color: number, type: 'start' | 'end', index: number, size=0.025/3) => {
       const geometry = new THREE.SphereGeometry(size, 16, 16);
       const material = new THREE.MeshStandardMaterial({ color, emissive: color });
       const sphere = new THREE.Mesh(geometry, material);
@@ -338,7 +338,7 @@ const Segments = (props: IProps) => {
       }
     };
 
-    start.forEach((p, i) => makeMarker(p, 0xffffff, 'start', i, 0.025));
+    start.forEach((p, i) => makeMarker(p, 0xffffff, 'start', i, 0.0125/3));
     second.forEach((p, i) => makeMarker(p, 0xffffff, 'start', i)); 
     end.forEach((p, i) => makeMarker(p, 0xffff00, 'end', i));  
  

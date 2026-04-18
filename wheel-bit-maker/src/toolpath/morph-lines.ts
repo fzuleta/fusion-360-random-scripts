@@ -74,7 +74,7 @@ export interface GCodeSettings {
 }
 
 export const DEFAULT_GCODE_SETTINGS: GCodeSettings = {
-  workOffset: 'G54',
+  workOffset: 'G56',
   startupPosition: { x: 50, y: 50, z: 0 },
   safeRetract: { z: 0 },
   machineActions: {

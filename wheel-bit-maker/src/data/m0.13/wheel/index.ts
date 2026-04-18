@@ -90,19 +90,20 @@ const pass0 = (): IConstruction => {
   const bit = bits.bit3_175mm_3_flute_aluminum;
   const cutZ = -0.5;
   const z = cutZ;
-
+  const stockDepth = -9;
+  const stockRampDepth = stockDepth-0.3;
   // console.log('Getting m0.13 Z112') 
   const lineA = [ // the border of the stock
     { x: 3, y: 0, z }, // y: stockRadius + bitRadius
-    { x: -9.3, y: 0, z }// y: stockRadius + bitRadius
+    { x: stockRampDepth, y: 0, z }// y: stockRadius + bitRadius
   ];
   const lineB =  // rough: leave extra support, only mill down to 1.1 mm here
     [
       { x: 3, y: 2.7, z },
       { x: -0.547, y: 2.7, z },
       { x: -0.547, y: 2.0, z },
-      { x: -9, y: 2.0, z },
-      { x: -9.3, y: 0, z }// y: stockRadius + bitRadius
+      { x: stockDepth, y: 2.0, z },
+      { x: stockRampDepth, y: 0, z }// y: stockRadius + bitRadius
   ];
  
   const applyBitRadiusAndStockRadius = (bitRadius: number, stockRadius: number) => {
