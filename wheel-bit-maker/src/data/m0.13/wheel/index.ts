@@ -214,7 +214,8 @@ const pass1 = (): IConstruction => {
         throw new Error('Material not found')
       }
       const {lineA, lineB} = applyBitRadiusAndStockRadius(bitRadius, stockRadius);
-      const endAngle = -360 + 50.22; // - means towards us in the elara
+      // this magic angle was discovered in illustrator by rotating the points on the center
+      const endAngle = -360 + 128; // - means towards us in the elara
       return {
         bit: b,
         bitMesh,
