@@ -99,6 +99,135 @@ export const appendTipCleanupToRightFlank = (
     }),
   ];
 }
+
+export const createMirroredToothPass = ({
+  bit = bits.bit3_175mm_3_flute_aluminum,
+  leftProfile,
+  name = '3. Tooth',
+  safeRetractZ = 3,
+  startAngle = 0,
+  endAngle = -45,
+  steps = 45 / 3,
+  tipCleanupLength = -0.1,
+  tipX = 0,
+}: {
+  bit?: IBit;
+  leftProfile: ITeethPoint[];
+  name?: string;
+  safeRetractZ?: number;
+  startAngle?: number;
+  endAngle?: number;
+  steps?: number;
+  tipCleanupLength?: number;
+  tipX?: number;
+}): IConstruction => {
+  const translateX = (pt: PointXYZ): PointXYZ => ({
+    ...pt,
+    x: pt.x + tipX,
+  });
+
+  const mirrorPointX = (pt: PointXYZ, axisX: number): PointXYZ => ({
+    ...pt,
+    x: 2 * axisX - pt.x,
+  });
+
+  const mirrorSegmentX = (segment: ITeethPoint, axisX: number): ITeethPoint => ({
+    from: mirrorPointX(segment.to, axisX),
+    to: mirrorPointX(segment.from, axisX),
+    ...(segment.center ? { center: mirrorPointX(segment.center, axisX) } : {}),
+  });
+
+  const pts = leftProfile.map((segment) => ({
+    from: translateX(segment.from),
+    to: translateX(segment.to),
+    ...(segment.center ? { center: translateX(segment.center) } : {}),
+  }));
+
+  const mirrorAxisX = pts.at(-1)?.to.x;
+  if (mirrorAxisX === undefined) {
+    throw new Error('Could not determine tooth mirror axis');
+  }
+
+  const mirroredFlank = pts
+    .slice(1)
+    .reverse()
+    .map((segment) => mirrorSegmentX(segment, mirrorAxisX));
+
+  const closingBaseStart = mirroredFlank.at(-1)?.to;
+  const closingBaseEnd = pts[0]?.from;
+  if (!closingBaseStart || !closingBaseEnd) {
+    throw new Error('Could not determine tooth closing base');
+  }
+
+  pts.push(
+    ...mirroredFlank,
+    {
+      from: { ...closingBaseStart },
+      to: { ...closingBaseEnd },
+    }
+  );
+
+  const comparisonProfile = tessellateToothProfile(pts, 0.01);
+
+  const _points: Segment[] = pts.map((it) => convertPointToSegment(it));
+  const { left, right } = getLeftRight(0.5, _points);
+  const rightWithTipCleanup = appendTipCleanupToRightFlank(left, right, tipCleanupLength);
+
+  const points: ISegments = {
+    all: _points.map((it) => convertPointToSegment(cloneSegment(it))),
+    left,
+    right: rightWithTipCleanup,
+  };
+
+  return {
+    name,
+    type: 'tooth',
+    defaultBit: bit,
+    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ }),
+    construct: (props: IConstructProps) => {
+      const material = props.material;
+      const toothPassVariant = props.toothPassVariant ?? DEFAULT_TOOTH_PASS_VARIANT;
+      const b: IBit = props.bit || bit;
+      const bitMesh = createBitMesh(b);
+      const matProps = b.material[material];
+      if (!matProps) {
+        alert('Material not found');
+        throw new Error('Material not found');
+      }
+      const { path } = wheel.getMesh(points, matProps.stepOver, bitMesh);
+
+      const {
+        segmentsForThreeJs,
+        segmentsForGcodeFitted,
+      } = generateToothPath(path, {
+        stepOver: matProps.stepOver,
+        stepOverIsMM: true,
+        alongMaxSegMM: 0.015,
+        arcResMM: 0.01,
+        baseFeed: matProps.feedRate,
+        bitDiameter: b.diameter,
+      });
+
+      return {
+        bit: b,
+        bitMesh,
+        segmentsForThreeJs,
+        segmentsForGcodeFitted,
+        originalLines: [[], path],
+        comparisonProfiles: [comparisonProfile],
+        rotation: {
+          mode: toothPassVariant === 'leftAcrossAllAnglesThenRight'
+            ? 'repeatPassOverRotation'
+            : 'fullPassPerRotation',
+          steps,
+          startAngle,
+          endAngle,
+        }
+      };
+    }
+  };
+}
+
 const pass0 = (): IConstruction => { 
   const bit = bits.bit3_175mm_3_flute_aluminum;
   const cutZ = -0.5;
@@ -325,143 +454,37 @@ const pass2 = (): IConstruction => {
   }
 } 
 const pass3 = (): IConstruction => {
-  const bit = bits.bit3_175mm_3_flute_aluminum; 
   const bottomCut = 2.0;
-  const tipX = -0.34;
-  const tipCleanupLength = -0.1;
-
-  const translateX = (pt: PointXYZ): PointXYZ => ({
-    ...pt,
-    x: pt.x + tipX,
-  });
-
-  const mirrorPointX = (pt: PointXYZ, axisX: number): PointXYZ => ({
-    ...pt,
-    x: 2 * axisX - pt.x,
-  });
-
-  const mirrorSegmentX = (segment: ITeethPoint, axisX: number): ITeethPoint => ({
-    from: mirrorPointX(segment.to, axisX),
-    to: mirrorPointX(segment.from, axisX),
-    ...(segment.center ? { center: mirrorPointX(segment.center, axisX) } : {}),
-  });
+  const tipX = -0.335;
+  const startOfTeethZ = bottomCut + 0.259;
 
   const leftProfile: ITeethPoint[] = [
     { // left base
-      from: { x: -1,      y: 0, z: bottomCut },
-      to:   { x: -0.209,  y: 0, z: bottomCut },
+      from: {   x: -1,     y: 0, z: bottomCut },
+      to:   {   x: -0.208, y: 0, z: bottomCut },
     },
     { // from base to first arc
-      from: { x: -0.209,  y: 0, z: bottomCut },
-      to:   { x: -0.209,  y: 0, z: bottomCut + 0.259 },
+      from: {   x: -0.209, y: 0, z: bottomCut },
+      to:   {   x: -0.209, y: 0, z: startOfTeethZ },
     },
     { // left first arc
-      from:   { x: -0.209, y: 0, z: bottomCut + 0.259 },
-      to:     { x: -0.099, y: 0, z: bottomCut + 0.47 },
-      center: { x: -0.365, y: 0, z: bottomCut + 0.474, anticlockwise: false },
+      from:   { x: -0.209, y: 0, z: startOfTeethZ },
+      to:     { x: -0.099, y: 0, z: startOfTeethZ + 0.205 },
+      center: { x: -0.359, y: 0, z: startOfTeethZ + 0.212, anticlockwise: false },
     },
     { // left line between arcs
-      from: { x: -0.099, y: 0, z: bottomCut + 0.47 },
-      to:   { x: -0.099,  y: 0, z: bottomCut + 0.504 },
+      from: { x: -0.099,  y: 0, z: startOfTeethZ + 0.205 },
+      to:   { x: -0.099,  y: 0, z: startOfTeethZ + 0.239 },
     },
-    { // left tip to center
-      from:   { x: -0.099,  y: 0, z: bottomCut + 0.504 },
-      to:     { x: 0,   y: 0, z: bottomCut + 0.603 },
-      center: { x: 0,   y: 0, z: bottomCut + 0.504, anticlockwise: true },
+    { // left tip to center 
+      from:   { x: -0.099,  y: 0, z: startOfTeethZ + 0.239 },
+      to:     { x: 0,   y: 0, z: startOfTeethZ + 0.335 },
+      center: { x: 0,   y: 0, z: startOfTeethZ + 0.235, anticlockwise: true },
     },
   ];
 
-  const pts = leftProfile.map((segment) => ({
-    from: translateX(segment.from),
-    to: translateX(segment.to),
-    ...(segment.center ? { center: translateX(segment.center) } : {}),
-  }));
-
-  const mirrorAxisX = pts.at(-1)?.to.x;
-  if (mirrorAxisX === undefined) {
-    throw new Error('Could not determine tooth mirror axis');
-  }
-
-  const mirroredFlank = pts
-    .slice(1)
-    .reverse()
-    .map((segment) => mirrorSegmentX(segment, mirrorAxisX));
-
-  const closingBaseStart = mirroredFlank.at(-1)?.to;
-  const closingBaseEnd = pts[0]?.from;
-  if (!closingBaseStart || !closingBaseEnd) {
-    throw new Error('Could not determine tooth closing base');
-  }
-
-  pts.push(
-    ...mirroredFlank,
-    {
-      from: { ...closingBaseStart },
-      to: { ...closingBaseEnd },
-    }
-  );
-
-  const comparisonProfile = tessellateToothProfile(pts, 0.01);
-
-  
-  const _points: Segment[] = pts.map(it => {
-    return convertPointToSegment(it);
+  return createMirroredToothPass({
+    leftProfile,
+    tipX,
   });
-
-  const {left, right} = getLeftRight(0.5, _points);
-  const rightWithTipCleanup = appendTipCleanupToRightFlank(left, right, tipCleanupLength);
-
-  const points: ISegments = {
-    all: _points.map(it => convertPointToSegment(cloneSegment(it))),
-    left,
-    right: rightWithTipCleanup,
-  }
-
-  return {
-    name: "3. Tooth", 
-    type: 'tooth',
-    defaultBit: bit, 
-    defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 3 }),
-    construct: (props: IConstructProps) => {
-      const material = props.material;
-      const toothPassVariant = props.toothPassVariant ?? DEFAULT_TOOTH_PASS_VARIANT;
-      const b: IBit = props.bit || bit;
-      const bitMesh = createBitMesh(b); 
-      const matProps = b.material[material];
-      if (!matProps) { 
-        alert('Material not found'); 
-        throw new Error('Material not found')
-      }
-      const { path } = wheel.getMesh(points, matProps.stepOver, bitMesh);
-
-      const {
-        segmentsForThreeJs,
-        segmentsForGcodeFitted,
-      } = generateToothPath(path, {
-        stepOver: matProps.stepOver, 
-        stepOverIsMM: true,
-        alongMaxSegMM: 0.015,
-        arcResMM: 0.01,
-        baseFeed: matProps.feedRate, 
-        bitDiameter: b.diameter,
-      });
-
-      return {
-        bit: b,
-        bitMesh,
-        segmentsForThreeJs,
-        segmentsForGcodeFitted,
-        originalLines: [[], path],
-        comparisonProfiles: [comparisonProfile],
-        rotation: {
-          mode: toothPassVariant === 'leftAcrossAllAnglesThenRight'
-            ? 'repeatPassOverRotation'
-            : 'fullPassPerRotation',
-          steps: 45 / 3, 
-          startAngle: 0, 
-          endAngle: -45,
-        } 
-      };
-    }
-  }
 } 
