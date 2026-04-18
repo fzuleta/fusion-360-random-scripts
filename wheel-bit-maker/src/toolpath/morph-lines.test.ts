@@ -9,6 +9,7 @@ import {
   type ToolpathSegment,
 } from './morph-lines';
 import { getPass as getWheelPass } from '../data/m0.13/wheel/index';
+import { buildRasterPath } from '../nihs_20_30/wheel';
 
 const baseSegments: ToolpathSegment[] = [
   {
@@ -340,21 +341,40 @@ describe('generateGCodeFromSegments', () => {
     expect(gcode).toContain('G0 A0.');
   });
 
-  it('keeps wheel tooth pass 4 as a rasterized linear toolpath', () => {
-    const pass = getWheelPass(4)();
+  it('mirrors the right tooth raster order so it starts from the far side', () => {
+    const point = { x: 10, y: 0, z: 2 } as TVector3;
+
+    expect(buildRasterPath([point], 1, 0.5, 'L2R').map(({ x, y, z }) => ({ x, y, z }))).toEqual([
+      { x: 10, y: -0.5, z: 2 },
+      { x: 10, y: 0.5, z: 2 },
+      { x: 9, y: 0.5, z: 2 },
+      { x: 9, y: -0.5, z: 2 },
+    ]);
+
+    expect(buildRasterPath([point], 1, 0.5, 'R2L').map(({ x, y, z }) => ({ x, y, z }))).toEqual([
+      { x: 10, y: 0.5, z: 2 },
+      { x: 10, y: -0.5, z: 2 },
+      { x: 11, y: -0.5, z: 2 },
+      { x: 11, y: 0.5, z: 2 },
+    ]);
+  });
+
+  it('keeps wheel tooth pass 3 as a rasterized linear toolpath with legacy left-across-all-angles replay by default', () => {
+    const pass = getWheelPass(3)();
     const constructed = pass.construct({
-      material: 'A2-Rough',
+      material: 'brass-Rough',
       stockRadius: 3,
       bit: pass.defaultBit,
     });
 
     expect(constructed.segmentsForGcodeFitted.some((seg) => seg.kind === 'arc')).toBe(false);
+    expect(constructed.rotation?.mode).toBe('repeatPassOverRotation');
 
     const passes = splitSegmentsIntoPasses(constructed.segmentsForGcodeFitted);
     expect(passes.length).toBe(2);
 
     const gcode = generateGCodeFromSegments({
-      material: 'A2-Rough',
+      material: 'brass-Rough',
       bit: constructed.bit,
       segments: constructed.segmentsForGcodeFitted,
       rotation: constructed.rotation,
@@ -362,5 +382,17 @@ describe('generateGCodeFromSegments', () => {
 
     expect(gcode.some((line) => /^G[23]\b/.test(line))).toBe(false);
     expect(gcode.some((line) => /^G0 X.* Z0\.000$/.test(line))).toBe(false);
+  });
+
+  it('allows wheel tooth pass 3 to switch to left-then-right-per-angle replay', () => {
+    const pass = getWheelPass(3)();
+    const constructed = pass.construct({
+      material: 'brass-Rough',
+      stockRadius: 3,
+      bit: pass.defaultBit,
+      toothPassVariant: 'leftThenRightPerAngle',
+    });
+
+    expect(constructed.rotation?.mode).toBe('fullPassPerRotation');
   });
 });

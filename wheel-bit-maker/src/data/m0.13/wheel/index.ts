@@ -3,10 +3,11 @@ import * as carbideBits from "../../../helpers/carbide-bits";
 import { createBitMesh, generatePath, generateToothPath, tessellateToothProfile } from "../../helpers";
 import { cloneSegment, convertPointToSegment, reverseSegmentList } from "../../../helpers";
 import * as wheel from '../../../nihs_20_30/wheel'; 
-import type { GCodeSettingsOverrides, IConstruction, IConstructProps } from '../..';
+import type { GCodeSettingsOverrides, IConstruction, IConstructProps, ToothPassVariant } from '../..';
 
 export const filename = 'm=0.13 Z=112.stl';
 const bits = carbideBits;
+const DEFAULT_TOOTH_PASS_VARIANT: ToothPassVariant = 'leftAcrossAllAnglesThenRight';
 const defaultPassPostSettings = ({
   x = 25,
   y = 25,
@@ -404,8 +405,9 @@ const pass3 = (): IConstruction => {
     type: 'tooth',
     defaultBit: bit, 
     defaultGcodeSettings: defaultPassPostSettings({ safeRetractZ: 3 }),
-    construct: (props: {bit?: IBit; material: TMaterial; stockRadius: number}) => {
+    construct: (props: IConstructProps) => {
       const material = props.material;
+      const toothPassVariant = props.toothPassVariant ?? DEFAULT_TOOTH_PASS_VARIANT;
       const b: IBit = props.bit || bit;
       const bitMesh = createBitMesh(b); 
       const matProps = b.material[material];
@@ -435,7 +437,9 @@ const pass3 = (): IConstruction => {
         originalLines: [[], path],
         comparisonProfiles: [comparisonProfile],
         rotation: {
-          mode: 'repeatPassOverRotation',
+          mode: toothPassVariant === 'leftAcrossAllAnglesThenRight'
+            ? 'repeatPassOverRotation'
+            : 'fullPassPerRotation',
           steps: 45 / 3, 
           startAngle: 0, 
           endAngle: -45,

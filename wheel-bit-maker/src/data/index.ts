@@ -3,6 +3,8 @@ import * as model_0_13_Z112 from './m0.13/wheel/index';
 import * as model_0_13_z14 from './m0.13/pinion/index';
 import type { GCodeSettings, ToolpathSegment } from '../toolpath/morph-lines';
 
+export type ToothPassVariant = 'leftThenRightPerAngle' | 'leftAcrossAllAnglesThenRight';
+
 export type GCodeSettingsOverrides =
   Partial<Omit<GCodeSettings, 'safeRetract' | 'machineActions'>> & {
     safeRetract?: Partial<GCodeSettings['safeRetract']>;
@@ -14,6 +16,7 @@ export interface IConstructProps {
   bit?: IBit; 
   material: TMaterial; 
   stockRadius: number;
+  toothPassVariant?: ToothPassVariant;
 }
 export interface IConstructed {
   bit: IBit; 

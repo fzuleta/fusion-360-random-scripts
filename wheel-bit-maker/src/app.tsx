@@ -3,7 +3,7 @@ import * as React from 'react'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import styles from './app.module.scss'
 import { STLLoader } from 'three-stdlib';
-import { models, type GCodeSettingsOverrides, type IConstructed, type IConstruction } from './data'; 
+import { models, type GCodeSettingsOverrides, type IConstructed, type IConstruction, type ToothPassVariant } from './data'; 
 import { degToRad, isNumeric, range } from './helpers';
 import { bitCatalog, getBitKey, getBitMaterials } from './helpers/carbide-bits';
 import {
@@ -45,6 +45,11 @@ const AXIS_VIEWS: Array<{ label: string; axis: AxisName; direction: 1 | -1 }> = 
   { label: '-Z', axis: 'z', direction: -1 },
 ];
 
+const TOOTH_PASS_VARIANTS: Array<{ value: ToothPassVariant; label: string }> = [
+  { value: 'leftAcrossAllAnglesThenRight', label: 'All left angles, then all right' },
+  { value: 'leftThenRightPerAngle', label: 'A0 left, then right, then rotate' },
+];
+
 function App() {
   const otherThingsToRenderRef = React.useRef<{[k: string]: () => unknown}>({});
   const [passNum, setPassNum] = React.useState(0);
@@ -59,6 +64,7 @@ function App() {
   const [constructed, setConstructed] = React.useState<IConstructed | undefined>(undefined);
   const [showMachinePreview, setShowMachinePreview] = React.useState(true);
   const [showComparisonProfiles, setShowComparisonProfiles] = React.useState(true);
+  const [toothPassVariant, setToothPassVariant] = React.useState<ToothPassVariant>('leftAcrossAllAnglesThenRight');
   const [gcodeSettings, setGcodeSettings] = React.useState<GCodeSettings>(DEFAULT_GCODE_SETTINGS);
   const [debouncedGcodeSettings, setDebouncedGcodeSettings] = React.useState<GCodeSettings>(DEFAULT_GCODE_SETTINGS);
   // const [lines, setLines] = React.useState<ILinesGotten>();
@@ -97,6 +103,7 @@ function App() {
     () => Boolean(constructed?.comparisonProfiles?.some((profile) => profile.length > 1)),
     [constructed],
   );
+  const showToothPassVariant = pass?.type === 'tooth';
 
   const snapToAxisView = React.useCallback((axis: AxisName, direction: 1 | -1) => {
     const camera = cameraRef.current;
@@ -531,17 +538,17 @@ function App() {
     setStepOver(bitMaterial.stepOver);
     setFeedRate(bitMaterial.feedRate);
     if (!pass || !selectedBit) { return; }
-    setConstructed(pass.construct({ bit: selectedBit, material: resolvedMaterial, stockRadius }));
-  }, [material, pass, resolvedMaterial, selectedBit, stockRadius]);
+    setConstructed(pass.construct({ bit: selectedBit, material: resolvedMaterial, stockRadius, toothPassVariant }));
+  }, [material, pass, resolvedMaterial, selectedBit, stockRadius, toothPassVariant]);
   React.useEffect(() => {
     if (!sceneRef.current || !pass || !selectedBit || !resolvedMaterial) return;
     const bit: IBit = JSON.parse(JSON.stringify(selectedBit));
     if (!bit.material[resolvedMaterial]) return;
     bit.material[resolvedMaterial]!.feedRate = feedRate;
     bit.material[resolvedMaterial]!.stepOver = stepOver;
-    const newConstructed = pass.construct({ bit, material: resolvedMaterial, stockRadius })
+    const newConstructed = pass.construct({ bit, material: resolvedMaterial, stockRadius, toothPassVariant })
     setConstructed(newConstructed);
-  }, [feedRate, stepOver, stockRadius, pass, resolvedMaterial, selectedBit]);  
+  }, [feedRate, stepOver, stockRadius, pass, resolvedMaterial, selectedBit, toothPassVariant]);  
   React.useEffect(() => {
     console.log("Changing constructed to: ", constructed)
     if (!sceneRef.current || !pass || !constructed) return;
@@ -734,6 +741,20 @@ return (
             ))}
           </select>
         </label>
+
+        {showToothPassVariant && (
+          <label>
+            Tooth sequence:
+            <select
+              value={toothPassVariant}
+              onChange={(e) => setToothPassVariant(e.target.value as ToothPassVariant)}
+            >
+              {TOOTH_PASS_VARIANTS.map((variant) => (
+                <option key={variant.value} value={variant.value}>{variant.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label>
           Step Over:

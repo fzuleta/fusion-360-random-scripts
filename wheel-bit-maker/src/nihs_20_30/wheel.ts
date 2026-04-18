@@ -258,7 +258,12 @@ export function buildRasterPath(
     const exitTo    = new THREE.Vector3(to.x   + sign * stepOver, to.y,   to.z);
     const exitFrom  = new THREE.Vector3(from.x + sign * stepOver, from.y, from.z);
 
-    path.push(asCutPoint(from), asCutPoint(to), asCutPoint(exitTo), asCutPoint(exitFrom));
+    if (dir === 'L2R') {
+      path.push(asCutPoint(from), asCutPoint(to), asCutPoint(exitTo), asCutPoint(exitFrom));
+      continue;
+    }
+
+    path.push(asCutPoint(to), asCutPoint(from), asCutPoint(exitFrom), asCutPoint(exitTo));
   }
 
   return path;
