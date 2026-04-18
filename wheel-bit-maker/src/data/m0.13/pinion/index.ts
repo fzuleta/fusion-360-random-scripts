@@ -11,25 +11,25 @@ const getCustomToothPass = (): IConstruction => {
   const leftProfile: ITeethPoint[] = [
     { // left base
       from: {   x: -1,     y: 0, z: bottomCut },
-      to:   {   x: -0.208, y: 0, z: bottomCut },
+      to:   {   x: -0.223, y: 0, z: bottomCut },
     },
     { // from base to first arc
-      from: {   x: -0.209, y: 0, z: bottomCut },
-      to:   {   x: -0.209, y: 0, z: startOfTeethZ },
+      from: {   x: -0.223, y: 0, z: bottomCut },
+      to:   {   x: -0.223, y: 0, z: startOfTeethZ },
     },
     { // left first arc
-      from:   { x: -0.209, y: 0, z: startOfTeethZ },
-      to:     { x: -0.099, y: 0, z: startOfTeethZ + 0.205 },
-      center: { x: -0.359, y: 0, z: startOfTeethZ + 0.212, anticlockwise: false },
+      from:   { x: -0.223, y: 0, z: startOfTeethZ },
+      to:     { x: -0.131, y: 0, z: startOfTeethZ + 0.085 },
+      center: { x: -0.238, y: 0, z: startOfTeethZ + 0.109, anticlockwise: false },
     },
     { // left line between arcs
-      from: { x: -0.099,  y: 0, z: startOfTeethZ + 0.205 },
-      to:   { x: -0.099,  y: 0, z: startOfTeethZ + 0.239 },
+      from: { x: -0.131, y: 0, z: startOfTeethZ + 0.085 },
+      to:   { x: -0.111,  y: 0, z: startOfTeethZ + 0.214 },
     },
     { // left tip to center 
-      from:   { x: -0.099,  y: 0, z: startOfTeethZ + 0.239 },
-      to:     { x: 0,   y: 0, z: startOfTeethZ + 0.335 },
-      center: { x: 0,   y: 0, z: startOfTeethZ + 0.235, anticlockwise: true },
+      from:   { x: -0.111,  y: 0, z: startOfTeethZ + 0.214 },
+      to:     { x: 0,   y: 0, z: startOfTeethZ + 0.302 },
+      center: { x: 0,   y: 0, z: startOfTeethZ + 0.188, anticlockwise: true },
     },
   ];
 
