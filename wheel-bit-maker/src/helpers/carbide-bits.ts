@@ -103,6 +103,62 @@ export const bit6_35mm_4_flute_chino: IBit = {
   }
 }
 
+export const bit3_175mm_4_flute_speed_tiger: IBit = {
+  diameter: 3.175,
+  height: 10,
+  toolNumber: 1,
+  material: {
+    'A2-Rough': {
+      spindleSpeed: 11000,
+      feedRate: 250,
+      stepOver: 0.05,
+    },
+    'A2-Finish': {
+      spindleSpeed: 12000,
+      feedRate: 220,
+      stepOver: 0.02,
+    },
+    'brass-Rough': {
+      spindleSpeed: 11500,
+      feedRate: 600,
+      stepOver: 0.1,
+    },
+    'brass-Finish': {
+      spindleSpeed: 11500,
+      feedRate: 375,
+      stepOver: 0.03,
+    }
+  }
+}
+
+export const bit3_175mm_4_flute_ht_73125_C3: IBit = {
+  diameter: 3.175,
+  height: 10,
+  toolNumber: 1,
+  material: {
+    'A2-Rough': {
+      spindleSpeed: 17000,
+      feedRate: 140,
+      stepOver: 0.01,
+    },
+    'A2-Finish': {
+      spindleSpeed: 17000,
+      feedRate: 120,
+      stepOver: 0.005,
+    },
+    'brass-Rough': {
+      spindleSpeed: 12500,
+      feedRate: 250,
+      stepOver: 0.01,
+    },
+    'brass-Finish': {
+      spindleSpeed: 12500,
+      feedRate: 200,
+      stepOver: 0.005,
+    }
+  }
+}
+
 export const bitCatalog: Array<{ key: string; label: string; bit: IBit }> = [
   { key: 'bit1mm', label: '1.0 mm', bit: bit1mm },
   { key: 'bit1_6mm_2_flute', label: '1.6256 mm 2 flute', bit: bit1_6mm_2_flute },
@@ -111,6 +167,8 @@ export const bitCatalog: Array<{ key: string; label: string; bit: IBit }> = [
   { key: 'bit3_175mm_4_flute_chino', label: '3.175 mm 4 flute Chino', bit: bit3_175mm_4_flute_chino },
   { key: 'bit3_175mm_3_flute_aluminum', label: '3.175 mm 3 flute Aluminum', bit: bit3_175mm_3_flute_aluminum },
   { key: 'bit6_35mm_4_flute_chino', label: '6.35 mm 4 flute Chino', bit: bit6_35mm_4_flute_chino },
+  { key: 'bit3_175mm_4_flute_speed_tiger', label: '3.175 mm 4 flute Speed Tiger', bit: bit3_175mm_4_flute_speed_tiger },
+  { key: 'bit3_175mm_4_flute_ht_73125_C3', label: '3.175 mm 4 flute Harvey Tool 73125-C3', bit: bit3_175mm_4_flute_ht_73125_C3 },
 ];
 
 export const getBitKey = (bit: IBit): string | undefined => {
