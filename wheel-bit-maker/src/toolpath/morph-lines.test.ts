@@ -35,6 +35,9 @@ const makeBit = (spindleSpeed?: number): IBit => ({
   diameter: 3.175,
   height: 12,
   toolNumber: 7,
+  brand: 'GENERIC',
+  label: "",
+  description: "",
   material: {
     'A2-Rough': spindleSpeed === undefined
       ? ({ feedRate: 500, stepOver: 0.1 } as IBit['material'][TMaterial])
