@@ -30,15 +30,15 @@ export const SPEEDTIGER_4F_3_175_COATED: IBit = {
   material: {
     'A2-Rough': {
       spindleSpeed: 12000,
-      feedRate: 480,   // Increased to prevent rubbing
-      stepOver: 0.3,   // 10% Diameter for HEM
+      feedRate: 480,   
+      stepOver: 0.2,
     },
     'A2-Finish': {
       spindleSpeed: 13000,
       feedRate: 350,
-      stepOver: 0.08,  // Clean finish
+      stepOver: 0.05,
     },
-  }, 
+  },
 }
 
 export const HARVEYTOOLS_4F_3_175mm_73125_C3: IBit = {
@@ -50,14 +50,14 @@ export const HARVEYTOOLS_4F_3_175mm_73125_C3: IBit = {
   description: '73125-C3 AlTiN COATED',
   material: {
     'A2-Rough': {
-      spindleSpeed: 17000,
-      feedRate: 140,
-      stepOver: 0.01,
+      spindleSpeed: 10000, 
+      feedRate: 320,       
+      stepOver: 0.15,      
     },
     'A2-Finish': {
-      spindleSpeed: 17000,
-      feedRate: 120,
-      stepOver: 0.005,
+      spindleSpeed: 11000, // Dropped from 17k to prevent edge-burn
+      feedRate: 220,       // Results in ~0.005mm chipload
+      stepOver: 0.05,      // Constant engagement for dimensional accuracy
     },
     'brass-Rough': {
       spindleSpeed: 12500,

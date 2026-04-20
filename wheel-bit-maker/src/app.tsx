@@ -84,7 +84,7 @@ function App() {
   // Shared progress for animBit <–> scrub slider
   const wheelStateRef = React.useRef<{ i: number; t: number }>({ i: 0, t: 0 });
   // Animation pause state
-  const isAnimationPausedRef = React.useRef(false);
+  const isAnimationPausedRef = React.useRef(true);
   const selectedBit = bitCatalog.find((bitOption) => bitOption.key === selectedBitKey)?.bit ?? pass?.defaultBit;
   const availableMaterials = React.useMemo(
     () => (selectedBit ? getBitMaterials(selectedBit) : []),
