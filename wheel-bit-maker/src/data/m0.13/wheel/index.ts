@@ -230,7 +230,7 @@ export const createMirroredToothPass = ({
 
 const pass0 = (): IConstruction => { 
   const bit = bits.HARVEYTOOLS_4F_3_175mm_73125_C3;
-  const cutZ = -2.0;
+  const cutZ = -3.0;
   const z = cutZ;
   const stockDepth = -11;
   const stockRampDepth = stockDepth-0.3;
@@ -310,7 +310,7 @@ const pass0 = (): IConstruction => {
 
 const pass1 = (): IConstruction => { 
   const bit = bits.HARVEYTOOLS_4F_3_175mm_73125_C3;   
-  const cutZ = -2.0;
+  const cutZ = -3.0;
   const z = cutZ; 
   
   const lineA =  // the inner profile
