@@ -867,6 +867,7 @@ return (
     <Overlay
       constructed={constructed}
       toolpathGroupRef={toolpathGroupRef}
+      selectedBit={selectedBit}
       gcodeSettings={gcodeSettings}
       onGcodeSettingsChange={setGcodeSettings}
       defaultToolNumber={defaultToolNumber}

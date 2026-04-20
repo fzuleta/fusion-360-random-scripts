@@ -41,6 +41,9 @@ declare type IBit = {
   diameter: number, 
   height: number, 
   toolNumber: number,
+  brand: 'GENERIC' | 'SPEED TIGER' | 'HARVEY TOOLS';
+  label: string;
+  description: string;
 
   material: {
     [material in TMaterial]?: {

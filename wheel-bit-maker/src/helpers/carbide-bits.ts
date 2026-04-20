@@ -1,123 +1,13 @@
-export const bit1mm: IBit = {
-  diameter: 1, 
-  height: 10, 
-  toolNumber: 1,  
-  material: {
-    'A2-Rough': {
-      spindleSpeed: 19404,
-      feedRate: 99,
-      stepOver: 0.08,
-    }
-  }
-}
-export const bit1_6mm_2_flute: IBit = {
-  diameter: 1.6256, 
-  height: 10, 
-  toolNumber: 1,  
-  material: {
-    'A2-Rough': {
-      spindleSpeed: 11937,
-      feedRate: 127,
-      stepOver: 0.25,
-    }
-  }
-}
-export const bit3_175mm_2_flute: IBit = {
-  diameter: 3.175, 
-  height: 10, 
-  toolNumber: 1,  
-  material: {
-    'A2-Rough': {
-      spindleSpeed: 11937,
-      feedRate: 127,
-      stepOver: 0.25,
-    }
-  }
-}
-export const bit3_175mm_4_flute_harveyTool: IBit = {
-  diameter: 3.175, 
-  height: 10, 
-  toolNumber: 1,  
-  material: {
-    'A2-Rough': {
-      spindleSpeed: 11937,
-      feedRate: 200,
-      stepOver: 0.55,
-    }
-  }
-}
-export const bit3_175mm_4_flute_chino: IBit = {
-  diameter: 3.175, 
-  height: 10, 
-  toolNumber: 1,  
-  material: {
-    'A2-Rough': {
-      spindleSpeed: 10500,
-      feedRate: 300,
-      stepOver: 0.35,
-    },
-    'A2-Finish': {
-      spindleSpeed: 11000,
-      feedRate: 220,
-      stepOver: 0.08,
-    },
-    'brass-Rough': {
-      spindleSpeed: 11000,
-      feedRate: 600,
-      stepOver: 0.5,
-    },
-    'brass-Finish': {
-      spindleSpeed: 11000,
-      feedRate: 350,
-      stepOver: 0.1,
-    }
-  }
-}
-export const bit3_175mm_3_flute_aluminum: IBit = {
-  diameter: 3.175, 
-  height: 10, 
-  toolNumber: 1,  
-  material: {
-    'brass-Rough': {
-      spindleSpeed: 11000,
-      feedRate: 800,
-      stepOver: 0.5,
-    },
-    'brass-Finish': {
-      spindleSpeed: 11000,
-      feedRate: 300,
-      stepOver: 0.05,
-    }
-  }
-}
-export const bit6_35mm_4_flute_chino: IBit = {
-  diameter: 6.35,
-  height: 10, 
-  toolNumber: 1,  
-  material: {
-    'A2-Rough': {
-      spindleSpeed: 3056,
-      feedRate: 490,
-      stepOver: 0.7,
-    }
-  }
-}
+ 
 
-export const bit3_175mm_4_flute_speed_tiger: IBit = {
+export const SPEEDTIGER_4F_3_175_UNCOATED: IBit = {
   diameter: 3.175,
   height: 10,
   toolNumber: 1,
+  brand: 'SPEED TIGER',
+  label: '3.175mm 4F Speed Tiger Uncoated',
+  description: 'Uncoated',
   material: {
-    'A2-Rough': {
-      spindleSpeed: 11000,
-      feedRate: 250,
-      stepOver: 0.05,
-    },
-    'A2-Finish': {
-      spindleSpeed: 12000,
-      feedRate: 220,
-      stepOver: 0.02,
-    },
     'brass-Rough': {
       spindleSpeed: 11500,
       feedRate: 600,
@@ -130,11 +20,34 @@ export const bit3_175mm_4_flute_speed_tiger: IBit = {
     }
   }
 }
-
-export const bit3_175mm_4_flute_ht_73125_C3: IBit = {
+export const SPEEDTIGER_4F_3_175_COATED: IBit = {
   diameter: 3.175,
   height: 10,
   toolNumber: 1,
+  brand: 'SPEED TIGER',
+  label: '3.175mm 4F Speed Tiger AlTiBN Coated',
+  description: 'AlTiBN Coated, CNC Router Bit for Hardened Steel, Alloy',
+  material: {
+    'A2-Rough': {
+      spindleSpeed: 12000,
+      feedRate: 480,   // Increased to prevent rubbing
+      stepOver: 0.3,   // 10% Diameter for HEM
+    },
+    'A2-Finish': {
+      spindleSpeed: 13000,
+      feedRate: 350,
+      stepOver: 0.08,  // Clean finish
+    },
+  }, 
+}
+
+export const HARVEYTOOLS_4F_3_175mm_73125_C3: IBit = {
+  diameter: 3.175,
+  height: 10,
+  toolNumber: 2,
+  brand: 'HARVEY TOOLS',
+  label: '3.175mm 4F Harvey Tools AlTiN COATED',
+  description: '73125-C3 AlTiN COATED',
   material: {
     'A2-Rough': {
       spindleSpeed: 17000,
@@ -159,16 +72,10 @@ export const bit3_175mm_4_flute_ht_73125_C3: IBit = {
   }
 }
 
-export const bitCatalog: Array<{ key: string; label: string; bit: IBit }> = [
-  { key: 'bit1mm', label: '1.0 mm', bit: bit1mm },
-  { key: 'bit1_6mm_2_flute', label: '1.6256 mm 2 flute', bit: bit1_6mm_2_flute },
-  { key: 'bit3_175mm_2_flute', label: '3.175 mm 2 flute', bit: bit3_175mm_2_flute },
-  { key: 'bit3_175mm_4_flute_harveyTool', label: '3.175 mm 4 flute Harvey Tool', bit: bit3_175mm_4_flute_harveyTool },
-  { key: 'bit3_175mm_4_flute_chino', label: '3.175 mm 4 flute Chino', bit: bit3_175mm_4_flute_chino },
-  { key: 'bit3_175mm_3_flute_aluminum', label: '3.175 mm 3 flute Aluminum', bit: bit3_175mm_3_flute_aluminum },
-  { key: 'bit6_35mm_4_flute_chino', label: '6.35 mm 4 flute Chino', bit: bit6_35mm_4_flute_chino },
-  { key: 'bit3_175mm_4_flute_speed_tiger', label: '3.175 mm 4 flute Speed Tiger', bit: bit3_175mm_4_flute_speed_tiger },
-  { key: 'bit3_175mm_4_flute_ht_73125_C3', label: '3.175 mm 4 flute Harvey Tool 73125-C3', bit: bit3_175mm_4_flute_ht_73125_C3 },
+export const bitCatalog: Array<{ key: string; label: string; bit: IBit }> = [ 
+  { key: 'bit3_175mm_4f_speed_tiger_uncoated', label: SPEEDTIGER_4F_3_175_UNCOATED.label, bit: SPEEDTIGER_4F_3_175_UNCOATED },
+  { key: 'bit3_175mm_4f_speed_tiger_coated', label: SPEEDTIGER_4F_3_175_COATED.label, bit: SPEEDTIGER_4F_3_175_COATED },
+  { key: 'bit3_175mm_4f_ht_73125_C3', label: HARVEYTOOLS_4F_3_175mm_73125_C3.label, bit: HARVEYTOOLS_4F_3_175mm_73125_C3 },
 ];
 
 export const getBitKey = (bit: IBit): string | undefined => {

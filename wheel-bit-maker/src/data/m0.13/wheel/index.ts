@@ -101,7 +101,7 @@ export const appendTipCleanupToRightFlank = (
 }
 
 export const createMirroredToothPass = ({
-  bit = bits.bit3_175mm_3_flute_aluminum,
+  bit = bits.HARVEYTOOLS_4F_3_175mm_73125_C3,
   leftProfile,
   name = '3. Tooth',
   safeRetractZ = 3,
@@ -229,7 +229,7 @@ export const createMirroredToothPass = ({
 }
 
 const pass0 = (): IConstruction => { 
-  const bit = bits.bit3_175mm_3_flute_aluminum;
+  const bit = bits.SPEEDTIGER_4F_3_175_UNCOATED;
   const cutZ = -0.5;
   const z = cutZ;
   const stockDepth = -11;
@@ -309,7 +309,7 @@ const pass0 = (): IConstruction => {
 } 
 
 const pass1 = (): IConstruction => { 
-  const bit = bits.bit3_175mm_3_flute_aluminum;   
+  const bit = bits.SPEEDTIGER_4F_3_175_UNCOATED;   
   const cutZ= -1.0;
   const z = cutZ; 
   
@@ -386,7 +386,7 @@ const pass1 = (): IConstruction => {
   }
 } 
 const pass2 = (): IConstruction => { 
-  const bit = bits.bit3_175mm_3_flute_aluminum; 
+  const bit = bits.SPEEDTIGER_4F_3_175_UNCOATED; 
   const cutZ= 2.0;
   const z = cutZ; 
   

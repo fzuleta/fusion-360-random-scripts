@@ -7,6 +7,7 @@ import { getRotaryAngles, type GCodeSettings } from '../toolpath/morph-lines';
 interface IProps {
   constructed?: IConstructed,
   toolpathGroupRef: React.RefObject<THREE.Group | null>,
+  selectedBit?: IBit,
   gcodeSettings: GCodeSettings,
   onGcodeSettingsChange: React.Dispatch<React.SetStateAction<GCodeSettings>>,
   defaultToolNumber?: number,
@@ -14,12 +15,34 @@ interface IProps {
 }
 export const Overlay = (props: IProps) => { 
   return !props.constructed ? null : <div className={styles.overlay}>
+  <SelectedBit {...props} />
   <PostSettings {...props} />
   <Rotation {...props} />
   <Segments {...props} /> 
   <WhatIsThisProject /> 
   <Disclaimer />
   </div>
+};
+
+const SelectedBit = ({ selectedBit }: IProps) => {
+  if (!selectedBit) {
+    return null;
+  }
+
+  return <details className={styles.accordion} open>
+    <summary className={styles.summary}>Selected Bit</summary>
+    <div className={styles.accordionContent}>
+      <div className={styles.inputGroup}>
+        <div><strong>Brand:</strong> {selectedBit.brand}</div>
+      </div>
+      <div className={styles.inputGroup}>
+        <div><strong>Label:</strong> {selectedBit.label}</div>
+      </div>
+      <div className={styles.inputGroup}>
+        <div><strong>Description:</strong> {selectedBit.description}</div>
+      </div>
+    </div>
+  </details>;
 };
 
 const PostSettings = (props: IProps) => {
