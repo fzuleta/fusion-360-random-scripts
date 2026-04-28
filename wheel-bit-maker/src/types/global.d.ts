@@ -36,7 +36,7 @@ type Segment = {
 };
 declare type ITeethPoint =  {from: PointXYZ, to: PointXYZ, center?: PointXYZ & {anticlockwise?: boolean}}
 
-declare type TMaterial = 'brass-Rough' | 'brass-Finish' | 'A2-Rough' | 'A2-Finish' | '316L' | 'carbide';
+declare type TMaterial = 'brass-Rough' | 'brass-Finish' | 'A2-Rough' | 'A2-Finish' | '316L' | 'carbide' | 'O1-Rough' | 'O1-Finish';
 declare type IBit = {
   diameter: number, 
   height: number, 

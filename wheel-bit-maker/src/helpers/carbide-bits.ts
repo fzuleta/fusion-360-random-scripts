@@ -38,6 +38,16 @@ export const SPEEDTIGER_4F_3_175_COATED: IBit = {
       feedRate: 350,
       stepOver: 0.05,
     },
+    'O1-Rough': {
+      spindleSpeed: 15000,
+      feedRate: 430,   
+      stepOver: 0.2,
+    },
+    'O1-Finish': {
+      spindleSpeed: 15000,
+      feedRate: 300,
+      stepOver: 0.05,
+    },
   },
 }
 
@@ -68,7 +78,17 @@ export const HARVEYTOOLS_4F_3_175mm_73125_C3: IBit = {
       spindleSpeed: 12500,
       feedRate: 200,
       stepOver: 0.005,
-    }
+    },
+    'O1-Rough': {
+      spindleSpeed: 15000,
+      feedRate: 480,   
+      stepOver: 0.2,
+    },
+    'O1-Finish': {
+      spindleSpeed: 15000,
+      feedRate: 350,
+      stepOver: 0.05,
+    },
   }
 }
 
